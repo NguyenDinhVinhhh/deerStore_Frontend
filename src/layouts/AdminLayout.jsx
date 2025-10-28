@@ -1,7 +1,6 @@
-import { Outlet } from "react-router-dom";
+import {Outlet } from "react-router-dom";
 import Sidebar from "../components/admin/Sidebar";
 import Navbar from "../components/admin/Navbar";
-import Overview from "../pages/admin/Overview";
 export default function AdminLayout() {
   return (
     <div className="d-flex" style={{ height: "100vh", overflow: "hidden" }}>
@@ -10,7 +9,7 @@ export default function AdminLayout() {
       <div className="flex-grow-1 d-flex flex-column">
         <Navbar />
         <div className="flex-grow-1 overflow-auto bg-light">
-          <Overview />
+                <Outlet/>
         </div>
       </div>
     </div>

@@ -1,8 +1,8 @@
 import { useState } from "react";
 import "./Sidebar.css";
-
+import { Link } from "react-router-dom";
 export default function Sidebar() {
-  // Trạng thái mở/đóng của các menu có submenu
+
   const [openMenus, setOpenMenus] = useState({
     staff: false,
     product: false,
@@ -21,21 +21,21 @@ export default function Sidebar() {
       </div>
 
       <ul className="nav flex-column">
-        {/* Tổng quan */}
+        
         <li className="nav-item mb-2">
           <a href="#" className="nav-link text-white">
             <i className="bi bi-speedometer2 me-2"></i> Tổng quan
           </a>
         </li>
 
-        {/* Đơn hàng */}
+       
         <li className="nav-item mb-2">
           <a href="#" className="nav-link text-white">
             <i className="bi bi-bag-check me-2"></i> Đơn hàng
           </a>
         </li>
 
-        {/* Sản phẩm có submenu */}
+      
         <li className="nav-item mb-2">
           <button
             className="nav-link text-white w-100 text-start border-0 bg-transparent d-flex align-items-center justify-content-between"
@@ -53,7 +53,10 @@ export default function Sidebar() {
 
           {openMenus.product && (
             <ul className="nav flex-column ms-4 mt-2 submenu">
-              <li><a href="#" className="nav-link text-white-50 small">Danh sách sản phẩm</a></li>
+              {/* <li><a href="/productList" className="nav-link text-white-50 small">Danh sách sản phẩm</a></li> */}
+               <Link to="/admin/productList" className="nav-link text-white-50 small">
+                          Danh sách sản phẩm
+                        </Link>
               <li><a href="#" className="nav-link text-white-50 small">Quản lý kho</a></li>
               <li><a href="#" className="nav-link text-white-50 small">Nhập hàng</a></li>
               <li><a href="#" className="nav-link text-white-50 small">Kiểm hàng</a></li>
@@ -62,7 +65,7 @@ export default function Sidebar() {
           )}
         </li>
 
-        {/* Khách hàng có submenu */}
+  
         <li className="nav-item mb-2">
           <button
             className="nav-link text-white w-100 text-start border-0 bg-transparent d-flex align-items-center justify-content-between"
@@ -87,7 +90,7 @@ export default function Sidebar() {
           )}
         </li>
 
-        {/* Nhân viên có submenu */}
+        
         <li className="nav-item mb-2">
           <button
             className="nav-link text-white w-100 text-start border-0 bg-transparent d-flex align-items-center justify-content-between"
@@ -113,21 +116,21 @@ export default function Sidebar() {
           )}
         </li>
 
-        {/* Báo cáo */}
+        
         <li className="nav-item mb-2">
           <a href="#" className="nav-link text-white">
             <i className="bi bi-graph-up me-2"></i> Báo cáo
           </a>
         </li>
 
-        {/* Bán tại quầy */}
+        
         <li className="nav-item mb-2">
           <a href="#" className="nav-link text-white">
             <i className="bi bi-shop-window me-2"></i> Bán tại quầy
           </a>
         </li>
 
-        {/* Cấu hình có submenu */}
+        
         <li className="nav-item mb-2">
           <button
             className="nav-link text-white w-100 text-start border-0 bg-transparent d-flex align-items-center justify-content-between"

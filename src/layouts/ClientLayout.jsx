@@ -13,10 +13,7 @@ function ClientLayout() {
 
       <Header />
       <main className="min-vh-100">
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/contact" element={<Contact />} />
-        </Routes>
+       
 
         <Outlet />
       </main>
