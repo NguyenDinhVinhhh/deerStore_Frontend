@@ -1,0 +1,31 @@
+@import "bootstrap-icons/font/bootstrap-icons.css";
+
+body {
+  font-family: "Inter", "Roboto", sans-serif;
+  background-color: #f8f9fa;
+  color: #333;
+  margin: 0;
+  padding: 0;
+}
+
+a {
+  text-decoration: none;
+  transition: 0.2s;
+}
+
+a:hover {
+  color: #f38b00 !important;
+}
+
+.btn-warning {
+  background-color: #f38b00 !important;
+  border: none;
+}
+
+.btn-warning:hover {
+  background-color: #e07c00 !important;
+}
+
+.text-dark {
+  color: #333 !important;
+}

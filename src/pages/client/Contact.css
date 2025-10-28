@@ -1,0 +1,27 @@
+.contact-page {
+  background-color: #777;
+  min-height: 80vh;
+}
+
+.contact-form,
+.contact-info {
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.contact-form input,
+.contact-form textarea {
+  background-color: #eee;
+  border: none;
+}
+
+.contact-form input:focus,
+.contact-form textarea:focus {
+  outline: none;
+  box-shadow: 0 0 5px rgba(255, 193, 7, 0.6);
+}
+
+.contact-info i {
+  color: #ffc107;
+  margin-right: 8px;
+}

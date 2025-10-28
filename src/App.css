@@ -1,0 +1,18 @@
+/* Reset mặc định để app full màn hình */
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* Loại bỏ max-width mặc định của Vite */
+#root {
+  max-width: none;
+}
+
+/* Đặt font chung nếu muốn */
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f8f9fa;
+}
