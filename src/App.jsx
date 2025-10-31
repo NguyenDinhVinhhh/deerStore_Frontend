@@ -8,6 +8,7 @@ import "./index.css";
 import Contact from "../src/pages/client/Contact";
 import Overview from "../src/pages/admin/Overview";
 import ProductList from "../src/pages/admin/ProductList";
+import Role from "../src/pages/admin/RoleManagement";
 function App() {
   return (
     <Router>
@@ -16,6 +17,7 @@ function App() {
         <Route path="/admin/*" element={<AdminLayout />}>
             <Route index element={<Overview />} />
             <Route path="productList" element={<ProductList />} />
+            <Route path="role" element={<Role />} />
         </Route>
         <Route path="/*" element={<ClientLayout />}>
             <Route index element={<Home />} />

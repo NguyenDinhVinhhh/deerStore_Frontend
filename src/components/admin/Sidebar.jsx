@@ -23,9 +23,9 @@ export default function Sidebar() {
       <ul className="nav flex-column">
         
         <li className="nav-item mb-2">
-          <a href="#" className="nav-link text-white">
-            <i className="bi bi-speedometer2 me-2"></i> Tổng quan
-          </a>
+          <Link to="/admin" className="nav-link text-white">
+            <i className="bi bi-bag-check me-2"></i> Tổng quan
+          </Link>
         </li>
 
        
@@ -149,7 +149,9 @@ export default function Sidebar() {
           {openMenus.config && (
             <ul className="nav flex-column ms-4 mt-2 submenu">
               <li><a href="#" className="nav-link text-white-50 small">Cài đặt hệ thống</a></li>
-              <li><a href="#" className="nav-link text-white-50 small">Phân quyền</a></li>
+              <Link to="/admin/role" className="nav-link text-white-50 small">
+                          Phân quyền
+                        </Link>
               <li><a href="#" className="nav-link text-white-50 small">Sao lưu dữ liệu</a></li>
             </ul>
           )}

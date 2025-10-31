@@ -29,7 +29,7 @@ export default function ProductList() {
   return (
     <div className="product-page">
       <div className="product-header d-flex justify-content-between align-items-center">
-        <h4>Danh sách sản phẩm</h4>
+        <h4>Loại sản phẩm | Compo | Thay đổi</h4>
         <Button variant="primary">+ Thêm sản phẩm</Button>
       </div>
 
