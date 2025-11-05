@@ -1,0 +1,67 @@
+.header-top {
+  background-color: #ef8037;
+  color: white;
+  font-size: 14px;
+  padding: 10px 0;
+  min-height:39px;
+}
+
+.header-top .social-icons i {
+  margin-left: 10px;
+  cursor: pointer;
+}
+
+.header-main {
+  background-color: white;
+  padding: 15px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.logo-img {
+  width:300px;
+  max-height: 90px;
+  margin-right: 10px;
+}
+
+.search-bar {
+  display: flex;
+  width: 40%;
+}
+
+.search-bar input {
+  flex: 1;
+  border: 1px solid #ccc;
+  padding: 8px;
+  border-right: none;
+  border-radius: 4px 0 0 4px;
+}
+
+.search-bar button {
+  background-color: #f47b20;
+  border: none;
+  padding: 0 15px;
+  color: white;
+  border-radius: 0 4px 4px 0;
+}
+
+.header-actions i {
+  font-size: 20px;
+  margin-right: 10px;
+}
+
+.cart-btn {
+  background-color: #f47b20;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  padding: 6px 15px;
+  font-weight: 600;
+}
+
+.header-bottom {
+  background-color: white;
+  padding: 10px 0;
+  border-bottom: 1px solid #eee;
+  font-weight: 600;
+  font-size: larger;
+}

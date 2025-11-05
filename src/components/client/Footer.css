@@ -1,0 +1,23 @@
+.footer {
+  background-color: #182537;
+}
+
+.footer h5 {
+  color: #ffb347;
+}
+
+.footer-link {
+  color: #ddd;
+  text-decoration: none;
+  display: block;
+  margin-bottom: 6px;
+  transition: color 0.2s ease;
+}
+
+.footer-link:hover {
+  color: #ffb347;
+}
+
+.footer i {
+  color: #ffb347;
+}

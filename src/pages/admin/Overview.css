@@ -1,0 +1,23 @@
+
+.overview {
+  background-color: #f0f1f1;
+}
+
+.overview .card {
+  border-radius: 10px;
+}
+
+.overview .list-group-item {
+  border: none;
+  border-bottom: 1px solid #eee;
+}
+
+.overview .badge {
+  font-size: 0.9rem;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

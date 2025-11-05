@@ -1,0 +1,14 @@
+.banner-container {
+  width: 100%;
+  height: 450px; /* bạn có thể đổi theo kích thước mong muốn */
+  overflow: hidden;
+  position: relative;
+}
+
+.banner-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* Giúp ảnh vừa khung mà không méo */
+  border-radius: 0; /* Không bo tròn */
+  transition: opacity 1s ease-in-out;
+}

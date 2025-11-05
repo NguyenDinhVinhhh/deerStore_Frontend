@@ -1,0 +1,27 @@
+.sidebar {
+  background-color: #172538;
+  color: white; 
+  width: 250px; 
+  height: 100vh;
+}
+.nav-link {
+  opacity: 0.9;
+  transition: background-color 0.3s, opacity 0.3s;
+  height: 50px;
+}
+
+.nav-link:hover {
+  background-color: #1e324d;
+  opacity: 1;
+}
+.sidebar-header {
+  padding: 10px;          /* tạo khoảng cách giữa logo và line */
+  margin: 15px 0px 15px 0px;           /* tạo khoảng trống phía dưới line */
+  border-bottom: 1px solid #2c3e50; /* đường kẻ chia cách (có thể đổi màu #2c3e50 -> #23344e cho gần giống ảnh) */
+}
+
+.sidebar-logo {
+  color: #ffffff;
+  font-weight: 700;
+  margin: 0;
+}
