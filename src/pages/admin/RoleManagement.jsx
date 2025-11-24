@@ -13,7 +13,6 @@ export default function RoleManagement() {
 
   const baseURL = "http://localhost:8080/api";
 
-  // ===== Lấy vai trò & quyền khi load trang =====
   useEffect(() => {
     fetchRoles();
     fetchPermissions();

@@ -1,0 +1,45 @@
+// services/invoiceApi.js
+import axios from "./axiosClient"; // Giả định axiosClient đã được cấu hình
+
+const BASE_URL = "/invoices"; // Endpoint chính là /api/invoices
+
+const invoiceApi = {
+  // =====================================
+  // 1. Tạo hóa đơn (bao gồm chi tiết items và payment)
+  // POST /api/invoices/create
+  // @param {object} data - Payload hóa đơn
+  // @returns {Promise<object>} Dữ liệu phản hồi (chứa payUrl nếu là thanh toán online)
+  // =====================================
+  createInvoice(data) {
+    // Endpoint hoàn chỉnh: /api/invoices/create
+    // Giả sử axiosClient được cấu hình để gửi JSON
+    return axios.post(`${BASE_URL}/create`, data);
+  },
+
+  // =====================================
+  // 2. Lấy chi tiết hóa đơn theo mã
+  // GET /api/invoices/{maHd}
+  // =====================================
+  getInvoiceDetails(maHd) {
+    return axios.get(`${BASE_URL}/${maHd}`);
+  },
+
+  // =====================================
+  // 3. Lấy danh sách hóa đơn theo ngày (ví dụ)
+  // GET /api/invoices/search
+  // =====================================
+  searchInvoices(params) {
+    // params có thể là { date: 'YYYY-MM-DD', status: 'PAID' }
+    return axios.get(`${BASE_URL}/search`, { params });
+  },
+
+  // =====================================
+  // 4. Cập nhật trạng thái hóa đơn (ví dụ: đã thanh toán)
+  // PUT /api/invoices/{maHd}/status
+  // =====================================
+  updateInvoiceStatus(maHd, statusData) {
+    return axios.put(`${BASE_URL}/${maHd}/status`, statusData);
+  },
+};
+
+export default invoiceApi;

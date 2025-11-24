@@ -1,27 +1,72 @@
+
 .sidebar {
   background-color: #172538;
-  color: white; 
-  width: 250px; 
+  color: white;
+  width: 250px;
   height: 100vh;
 }
+
 .nav-link {
   opacity: 0.9;
-  transition: background-color 0.3s, opacity 0.3s;
-  height: 50px;
+  transition: background-color 0.2s ease, opacity 0.2s ease,
+    border-left 0.2s ease;
+  padding: 12px 15px;
+  border-radius: 6px;
 }
 
+
 .nav-link:hover {
-  background-color: #1e324d;
+  background-color: #1e324d !important;
   opacity: 1;
 }
+
+/* Đảm bảo menu cha cũng nhận hover */
+.nav > .nav-item > button.nav-link:hover {
+  background-color: #1e324d !important;
+  opacity: 1;
+}
+
+
+.nav-link.active {
+  background-color: #0d6efd !important; 
+  opacity: 1;
+  border-left: 4px solid #66b0ff; 
+  padding-left: 12px;
+  color: #fff !important;
+}
+
+
+
+.submenu .nav-link {
+  padding: 8px 10px;
+  font-size: 14px;
+  opacity: 0.75;
+}
+
+
+.submenu .nav-link:hover {
+  background-color: #2a3f58 !important;
+  opacity: 1;
+}
+
+
+.submenu .nav-link.active {
+  background-color: #0a58ca !important; 
+  opacity: 1;
+  border-left: 4px solid #66b0ff;
+  padding-left: 8px;
+  color: #fff !important;
+}
+
+
 .sidebar-header {
-  padding: 10px;          /* tạo khoảng cách giữa logo và line */
-  margin: 15px 0px 15px 0px;           /* tạo khoảng trống phía dưới line */
-  border-bottom: 1px solid #2c3e50; /* đường kẻ chia cách (có thể đổi màu #2c3e50 -> #23344e cho gần giống ảnh) */
+  padding: 12px;
+  margin: 15px 0;
+  border-bottom: 1px solid #2c3e50;
 }
 
 .sidebar-logo {
-  color: #ffffff;
-  font-weight: 700;
+  font-weight: bold;
   margin: 0;
+  font-size: 20px;
 }

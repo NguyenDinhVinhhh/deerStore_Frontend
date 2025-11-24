@@ -37,9 +37,7 @@ function Header() {
 
           <div className="header-actions d-flex align-items-center">
             <i className="bi bi-person-circle"></i>
-            <button className="cart-btn">
-              Đăng nhập 
-            </button>
+            <Link to="/login" className="cart-btn">Đăng nhập</Link>
           </div>
         </div>
       </div>

@@ -1,0 +1,55 @@
+.employee-page {
+  background: #f0f1f1;
+  min-height: 100vh;
+}
+
+.table th {
+  color: #374151;
+  font-weight: 600;
+}
+
+.table td {
+  color: #4b5563;
+  vertical-align: middle;
+}
+
+.emp-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.emp-avatar {
+  width: 36px;
+  height: 36px;
+  background-color: #2563eb;
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+}
+
+.action-icons {
+  display: flex;
+  gap: 10px;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.action-icons svg:hover {
+  transform: scale(1.15);
+  transition: 0.2s ease;
+}
+
+.btn-primary {
+  background-color: #2563eb;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.btn-primary:hover {
+  background-color: #1e40af;
+}

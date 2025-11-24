@@ -2,27 +2,39 @@
 import axios from "axios";
 
 const axiosClient = axios.create({
-  baseURL: "http://localhost:8080/api", // URL backend Spring Boot
+  baseURL: "http://localhost:8080/api",
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-// ✅ Tự động chèn token nếu có (khi login)
-axiosClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+// ✅ Chèn token cho những API cần xác thực
+axiosClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token");
 
-// ✅ Bắt lỗi chung cho toàn hệ thống
+    // Nếu có token và endpoint KHÔNG thuộc nhóm public
+    const isPublicEndpoint =
+      config.url.includes("/san-pham") || // public
+      config.url.includes("/danh-muc") || // public
+      config.url.includes("/register") || // public
+      config.url.includes("/login"); // public
+
+    if (token && !isPublicEndpoint) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// ✅ Bắt lỗi chung
 axiosClient.interceptors.response.use(
   (response) => response.data,
   (error) => {
-    console.error("API Error:", error.response);
-    throw error;
+    console.error("API Error:", error.response || error);
+    return Promise.reject(error);
   }
 );
 
