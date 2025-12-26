@@ -1,328 +1,324 @@
-import React, { useState } from "react";
-import khachHangApi from "../../../services/customersApi";
+import React, { useState, useEffect } from "react";
 import {
-  Container,
+  Table,
+  Button,
+  Form,
+  Spinner,
   Row,
   Col,
-  Button,
   Card,
-  Nav,
   InputGroup,
-  FormControl,
-  Table,
-  Spinner,
-  Alert,
-  Modal,
-  Form,
 } from "react-bootstrap";
-import {
-  Search,
-  Funnel,
-  BoxArrowDown,
-  BoxArrowInUp,
-  Gear,
-} from "react-bootstrap-icons";
-
+import { useForm } from "react-hook-form";
 import { useCustomer } from "../../../hooks/use-customer";
-import { useQueryClient } from "@tanstack/react-query";
+import khachHangApi from "../../../services/customersApi"; // Đảm bảo đúng file service
+import { formatVND } from "../../../utils/formatUtils";
+import { FaChevronLeft, FaUserCircle, FaSearch, FaTimes } from "react-icons/fa";
+import Swal from "sweetalert2";
 
-const formatCurrency = (amount) => {
-  if (typeof amount !== "number" || isNaN(amount)) {
-    return "0";
-  }
-  return amount.toLocaleString("vi-VN");
-};
+export default function CustomerList() {
+  const [view, setView] = useState("list");
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
 
-function Customer() {
-  const queryClient = useQueryClient();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // Xử lý Debounce cho ô tìm kiếm
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
 
   const {
-    data: danhSachKhachHang = [],
-    isLoading: loading,
-    isError,
+    data: customers = [],
+    isLoading,
     refetch,
-  } = useCustomer();
-  console.log("a", danhSachKhachHang);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [showModal, setShowModal] = useState(false);
-  const [newCustomer, setNewCustomer] = useState({
-    hoTen: "",
-    sdt: "",
-    email: "",
-    diaChi: "",
-  });
+  } = useCustomer(debouncedSearch);
 
-  const handleSearch = async () => {
-    // Nếu searchTerm rỗng, gọi refetch để tải lại dữ liệu từ cache/API
-    if (!searchTerm || searchTerm.trim() === "") {
-      refetch();
-      return;
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm();
+
+  const handleEdit = (customer = null) => {
+    setSelectedCustomer(customer);
+    if (customer) {
+      reset({
+        hoTen: customer.hoTen,
+        sdt: customer.sdt,
+        email: customer.email || "",
+        diaChi: customer.diaChi || "",
+        ghiChu: customer.ghiChu || "",
+      });
+    } else {
+      reset({ hoTen: "", sdt: "", email: "", diaChi: "", ghiChu: "" });
     }
+    setView("edit");
+  };
 
+  const handleBack = () => {
+    setView("list");
+    setSelectedCustomer(null);
+  };
+
+  const onSubmit = async (data) => {
     try {
-      const responseData = await khachHangApi.search(searchTerm);
+      // Khớp chính xác với cấu trúc JSON trong ảnh Postman của bạn
+      const payload = {
+        hoTen: data.hoTen,
+        sdt: data.sdt,
+        email: data.email || null,
+        diaChi: data.diaChi || null,
+        ghiChu: data.ghiChu || null,
+      };
 
-      queryClient.setQueryData(["customer"], responseData); // Tạm ghi đè cache
-    } catch (err) {
-      console.error("Lỗi tìm kiếm:", err);
-    }
-  };
+      if (selectedCustomer) {
+        // Cập nhật khách hàng hiện tại
+        await khachHangApi.update(selectedCustomer.maKh, payload);
+        Swal.fire("Thành công", "Cập nhật khách hàng thành công", "success");
+      } else {
+        // Thêm khách hàng mới dựa trên POST http://localhost:8080/api/khach-hang
+        await khachHangApi.create(payload);
+        Swal.fire("Thành công", "Thêm khách hàng thành công", "success");
+      }
 
-  const handleCreateCustomer = async (e) => {
-    e.preventDefault();
-    try {
-      await khachHangApi.create(newCustomer);
-      handleCloseModal();
-
-      await queryClient.invalidateQueries({ queryKey: ["customer"] });
-
-      alert("Thêm khách hàng thành công!");
-    } catch (err) {
-      alert(
-        "Lỗi khi thêm khách hàng. Vui lòng kiểm tra số điện thoại có bị trùng không."
-      );
-      console.error("Lỗi tạo khách hàng:", err);
-    }
-  };
-
-  const handleSearchChange = (e) => {
-    const newSearchTerm = e.target.value;
-    setSearchTerm(newSearchTerm);
-
-    if (newSearchTerm === "") {
       refetch();
-    }
-  };
-
-  const handleSearchKeyDown = (e) => {
-    if (e.key === "Enter") {
-      handleSearch();
-    }
-  };
-
-  const handleCloseModal = () => {
-    setShowModal(false);
-    setNewCustomer({ hoTen: "", sdt: "", email: "", diaChi: "" });
-  };
-  const handleShowModal = () => setShowModal(true);
-
-  const handleNewCustomerChange = (e) => {
-    const { name, value } = e.target;
-    setNewCustomer((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const renderTableBody = () => {
-    if (loading) {
-      return (
-        <tr>
-          <td colSpan="9" className="text-center">
-            <Spinner animation="border" size="sm" /> Đang tải dữ liệu...
-          </td>
-        </tr>
+      handleBack();
+    } catch (error) {
+      console.error("Lỗi API:", error.response?.data || error.message);
+      Swal.fire(
+        "Lỗi",
+        error.response?.data?.message ||
+          "Thao tác thất bại. Vui lòng kiểm tra lại dữ liệu.",
+        "error"
       );
     }
-
-    if (isError) {
-      return (
-        <tr>
-          <td colSpan="9">
-            <Alert variant="danger" className="m-0">
-              {
-                "Không thể tải danh sách khách hàng. Vui lòng kiểm tra Server và Network."
-              }
-            </Alert>
-          </td>
-        </tr>
-      );
-    }
-
-    if (danhSachKhachHang.length === 0) {
-      return (
-        <tr>
-          <td colSpan="9" className="text-center text-muted">
-            Không có dữ liệu khách hàng.
-          </td>
-        </tr>
-      );
-    }
-
-    return danhSachKhachHang.map((kh) => (
-      <tr key={kh.maKh}>
-        <td>
-          <Form.Check type="checkbox" />
-        </td>
-        <td>
-          <a href="#">{kh.maKh ? `CUZN${kh.maKh}` : "N/A"}</a>
-        </td>
-        <td>{kh.hoTen}</td>
-        <td>{kh.sdt}</td>
-
-        <td>{kh.tenNhom || "Bán lẻ"}</td>
-
-        <td>{formatCurrency(kh.tongChiTieuLuyKe || 0)}</td>
-
-        <td>{kh.tongSoDonHang || 0}</td>
-      </tr>
-    ));
   };
 
-  return (
-    <Container fluid className="mt-3">
-      {/* === Header và Nút Thêm === */}
-      <Row className="mb-3">
-        <Col md={8} className="d-flex align-items-center">
-          <Button variant="outline-secondary" size="sm" className="me-2">
-            <BoxArrowDown className="me-1" /> Xuất file
-          </Button>
-          <Button variant="outline-secondary" size="sm">
-            <BoxArrowInUp className="me-1" /> Nhập file
-          </Button>
-        </Col>
-        <Col md={4} className="text-end">
-          <Button variant="primary" onClick={handleShowModal}>
+  // Giao diện Danh sách
+  if (view === "list") {
+    return (
+      <div className="p-4 bg-light min-vh-100">
+        <div className="d-flex justify-content-between align-items-center mb-4">
+          <InputGroup style={{ maxWidth: "400px" }} className="shadow-sm">
+            <InputGroup.Text className="bg-white border-end-0 text-muted">
+              <FaSearch />
+            </InputGroup.Text>
+            <Form.Control
+              placeholder="Tìm theo tên hoặc số điện thoại..."
+              className="border-start-0 ps-0 shadow-none"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            {searchTerm && (
+              <Button
+                variant="outline-secondary"
+                className="border-start-0 text-muted bg-white shadow-none"
+                onClick={() => setSearchTerm("")}
+              >
+                <FaTimes />
+              </Button>
+            )}
+          </InputGroup>
+
+          <Button
+            variant="primary"
+            onClick={() => handleEdit()}
+            className="px-4 fw-bold shadow-sm"
+          >
             + Thêm khách hàng
           </Button>
-        </Col>
-      </Row>
+        </div>
 
-      {/* === Card chính: Bảng Khách hàng === */}
-      <Card>
-        <Card.Header>
-          <Nav
-            variant="tabs"
-            defaultActiveKey="#all"
-            className="card-header-tabs"
-          >
-            <Nav.Item>
-              <Nav.Link href="#all">Tất cả khách hàng</Nav.Link>
-            </Nav.Item>
-            <Nav.Item>
-              <Nav.Link href="#trading">Đang giao dịch</Nav.Link>
-            </Nav.Item>
-          </Nav>
-        </Card.Header>
-
-        <Card.Body>
-          {/* Thanh Search và Filter */}
-          <Row className="mb-3">
-            <Col md={6}>
-              <InputGroup>
-                <InputGroup.Text>
-                  <Search />
-                </InputGroup.Text>
-                <FormControl
-                  placeholder="Tìm kiếm theo mã khách hàng, tên, SĐT khách hàng"
-                  value={searchTerm}
-                  onChange={handleSearchChange}
-                  onKeyDown={handleSearchKeyDown}
-                />
-                <Button variant="outline-secondary" onClick={handleSearch}>
-                  Tìm
-                </Button>
-              </InputGroup>
-            </Col>
-            <Col md={6} className="d-flex justify-content-end">
-              <Button variant="outline-secondary" className="me-2">
-                <Funnel className="me-1" /> Bộ lọc
-              </Button>
-              <Button variant="outline-secondary">Lưu bộ lọc</Button>
-            </Col>
-          </Row>
-
-          {/* Toolbar Bảng */}
-          <div className="d-flex justify-content-between align-items-center mb-2">
-            <div>
-              <Form.Check type="checkbox" label="Chọn tất cả" />
-            </div>
-            <div>
-              <Button variant="link" size="sm" className="p-0">
-                <Gear size={20} />
-              </Button>
-            </div>
+        {isLoading ? (
+          <div className="text-center py-5">
+            <Spinner animation="border" variant="primary" />
           </div>
+        ) : (
+          <Card className="border-0 shadow-sm overflow-hidden">
+            <Table hover responsive className="align-middle mb-0">
+              <thead className="table-light">
+                <tr>
+                  <th className="ps-4">Khách hàng</th>
+                  <th>Số điện thoại</th>
+                  <th>Hạng thành viên</th>
+                  <th className="text-end">Tổng chi tiêu</th>
+                  <th className="text-center pe-4">Số đơn hàng</th>
+                </tr>
+              </thead>
+              <tbody>
+                {customers && customers.length > 0 ? (
+                  customers.map((c) => (
+                    <tr
+                      key={c.maKh}
+                      onClick={() => handleEdit(c)}
+                      style={{ cursor: "pointer" }}
+                    >
+                      <td className="ps-4">
+                        <div className="fw-bold text-dark">{c.hoTen}</div>
+                        <small className="text-muted">{c.email || "---"}</small>
+                      </td>
+                      <td>{c.sdt}</td>
+                      <td>
+                        <span className="badge bg-primary-subtle text-primary rounded-pill px-3 py-2">
+                          {c.tenNhom || "Thành viên Mới"}
+                        </span>
+                      </td>
+                      <td className="text-end fw-bold">
+                        {formatVND(c.tongChiTieuLuyKe || 0)}
+                      </td>
+                      <td className="text-center pe-4">
+                        {c.tongSoDonHang || 0}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="5" className="text-center py-5 text-muted">
+                      {searchTerm
+                        ? `Không tìm thấy khách hàng nào khớp với "${searchTerm}"`
+                        : "Chưa có dữ liệu khách hàng"}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </Table>
+          </Card>
+        )}
+      </div>
+    );
+  }
 
-          {/* Bảng Dữ Liệu */}
-          <Table responsive hover size="sm">
-            <thead className="bg-light">
-              <tr>
-                <th>
-                  <Form.Check type="checkbox" />
-                </th>
-                <th>Mã khách hàng</th>
-                <th>Tên khách hàng</th>
-                <th>Số điện thoại</th>
-                <th>Hạng thành viên</th>
-                <th>Tổng chi tiêu</th>
-                <th>Tổng SL đơn hàng</th>
-              </tr>
-            </thead>
-            <tbody>{renderTableBody()}</tbody>
-          </Table>
-        </Card.Body>
-      </Card>
+  // Giao diện Chỉnh sửa/Thêm mới
+  return (
+    <div className="bg-light min-vh-100">
+      <div className="d-flex justify-content-between align-items-center p-3 bg-white border-bottom shadow-sm">
+        <div
+          onClick={handleBack}
+          style={{ cursor: "pointer" }}
+          className="d-flex align-items-center text-secondary fw-medium"
+        >
+          <FaChevronLeft className="me-2" />
+          <span>Quay lại danh sách khách hàng</span>
+        </div>
+        <Button
+          variant="primary"
+          className="px-4 fw-bold shadow-sm"
+          onClick={handleSubmit(onSubmit)}
+        >
+          {selectedCustomer ? "Cập nhật khách hàng" : "Lưu khách hàng"}
+        </Button>
+      </div>
 
-      {/* Modal Thêm mới Khách hàng (Giữ nguyên) */}
-      <Modal show={showModal} onHide={handleCloseModal} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>Thêm mới khách hàng</Modal.Title>
-        </Modal.Header>
-        <Form onSubmit={handleCreateCustomer}>
-          <Modal.Body>
-            <Form.Group className="mb-3" controlId="formHoTen">
-              <Form.Label>Tên khách hàng (*)</Form.Label>
-              <Form.Control
-                type="text"
-                name="hoTen"
-                value={newCustomer.hoTen}
-                onChange={handleNewCustomerChange}
-                required
-              />
-            </Form.Group>
-            <Form.Group className="mb-3" controlId="formSdt">
-              <Form.Label>Số điện thoại (*)</Form.Label>
-              <Form.Control
-                type="text"
-                name="sdt"
-                value={newCustomer.sdt}
-                onChange={handleNewCustomerChange}
-                required
-              />
-            </Form.Group>
-            <Form.Group className="mb-3" controlId="formEmail">
-              <Form.Label>Email</Form.Label>
-              <Form.Control
-                type="email"
-                name="email"
-                value={newCustomer.email}
-                onChange={handleNewCustomerChange}
-              />
-            </Form.Group>
-            <Form.Group className="mb-3" controlId="formDiaChi">
-              <Form.Label>Địa chỉ</Form.Label>
+      <Form className="p-4">
+        <Row>
+          {/* Cột trái: Thông tin chính */}
+          <Col md={7}>
+            <Card className="border-0 shadow-sm p-4 mb-4">
+              <h5 className="fw-bold mb-4">Thông tin chung</h5>
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-medium">
+                  Họ tên khách hàng <span className="text-danger">*</span>
+                </Form.Label>
+                <Form.Control
+                  {...register("hoTen", { required: "Vui lòng nhập họ tên" })}
+                  isInvalid={!!errors.hoTen}
+                  placeholder="Nhập họ và tên khách hàng"
+                />
+                <Form.Control.Feedback type="invalid">
+                  {errors.hoTen?.message}
+                </Form.Control.Feedback>
+              </Form.Group>
+
+              <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label className="fw-medium">
+                      Số điện thoại <span className="text-danger">*</span>
+                    </Form.Label>
+                    <Form.Control
+                      {...register("sdt", {
+                        required: "Vui lòng nhập SĐT",
+                        pattern: {
+                          value: /^[0-9]{10,11}$/,
+                          message: "SĐT không hợp lệ",
+                        },
+                      })}
+                      isInvalid={!!errors.sdt}
+                      placeholder="0912345678"
+                    />
+                    <Form.Control.Feedback type="invalid">
+                      {errors.sdt?.message}
+                    </Form.Control.Feedback>
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label className="fw-medium">Email</Form.Label>
+                    <Form.Control
+                      {...register("email")}
+                      type="email"
+                      placeholder="nguyenvanan@gmail.com"
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
+
+              <Form.Group className="mb-3">
+                <Form.Label className="fw-medium">Địa chỉ</Form.Label>
+                <Form.Control
+                  {...register("diaChi")}
+                  placeholder="Quận 10, TP. Hồ Chí Minh"
+                />
+              </Form.Group>
+            </Card>
+          </Col>
+
+          {/* Cột phải: Thống kê & Ghi chú */}
+          <Col md={5}>
+            {selectedCustomer && (
+              <Card className="border-0 shadow-sm p-4 mb-4 bg-primary text-white text-center shadow-sm">
+                <FaUserCircle size={60} className="mb-3" />
+                <h5 className="mb-1 fw-bold">
+                  {selectedCustomer.tenNhom || "Thành viên Mới"}
+                </h5>
+                <div className="small opacity-75">Hạng thành viên hiện tại</div>
+                <hr className="my-3 border-white opacity-25" />
+                <div className="d-flex justify-content-around">
+                  <div>
+                    <div className="h4 mb-0 fw-bold">
+                      {selectedCustomer.tongSoDonHang || 0}
+                    </div>
+                    <div className="small opacity-75">Đơn hàng</div>
+                  </div>
+                  <div className="border-end border-white opacity-25"></div>
+                  <div>
+                    <div className="h4 mb-0 fw-bold">
+                      {formatVND(selectedCustomer.tongChiTieuLuyKe || 0)}
+                    </div>
+                    <div className="small opacity-75">Đã chi tiêu</div>
+                  </div>
+                </div>
+              </Card>
+            )}
+
+            <Card className="border-0 shadow-sm p-4">
+              <h5 className="fw-bold mb-3">Ghi chú khách hàng</h5>
               <Form.Control
                 as="textarea"
-                rows={3}
-                name="diaChi"
-                value={newCustomer.diaChi}
-                onChange={handleNewCustomerChange}
+                rows={5}
+                {...register("ghiChu")}
+                placeholder="Ví dụ: Khách mua lần đầu, khách ưu tiên..."
+                className="shadow-none"
               />
-            </Form.Group>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={handleCloseModal}>
-              Hủy
-            </Button>
-            <Button variant="primary" type="submit">
-              Lưu
-            </Button>
-          </Modal.Footer>
-        </Form>
-      </Modal>
-    </Container>
+            </Card>
+          </Col>
+        </Row>
+      </Form>
+    </div>
   );
 }
-
-export default Customer;

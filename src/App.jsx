@@ -10,6 +10,7 @@ import Contact from "../src/pages/client/Contact";
 import AllProduct from "../src/pages/client/AllProduct";
 import Login from "../src/pages/client/Login";
 import Overview from "../src/pages/admin/Overview";
+import Dashboard from "../src/pages/admin/Dashboard/Dashboard";
 import ProductList from "../src/pages/admin/Products/Products";
 
 import AdminLayout from "./layouts/AdminLayout";
@@ -18,9 +19,10 @@ import CustomerGroup from "../src/pages/admin/CustomerGroup/CustomerGroup";
 import EmployeeList from "../src/pages/admin/Employee/EmployeeList";
 import Configuration from "./pages/admin/Configuration/Configuration";
 import Nhaphang from "./pages/admin/Inventory/Inventory";
+import Invoices from "./pages/admin/Invoice/InvoiceList";
 import Role from "./pages/admin/RoleManagement";
 import NoPermission from "../src/pages/admin/NoPermission";
-
+import { ToastContainer } from "react-toastify";
 import Pos from "./layouts/Pos";
 function App() {
   return (
@@ -28,8 +30,9 @@ function App() {
       <Routes>
         <Route path="/pos" element={<Pos />} />
         <Route path="/admin/*" element={<AdminLayout />}>
-          <Route index element={<Overview />} />
-          <Route path="overview" element={<Overview />} />
+          <Route index element={<Dashboard />} />
+          <Route path="overview" element={<Dashboard />} />
+          <Route path="xem-danh-sach-don-hang" element={<Invoices />} />
           <Route path="no-permission" element={<NoPermission />} />
 
           <Route
@@ -114,6 +117,7 @@ function App() {
           <Route path="login" element={<Login />} />
         </Route>
       </Routes>
+      <ToastContainer />
     </Router>
   );
 }

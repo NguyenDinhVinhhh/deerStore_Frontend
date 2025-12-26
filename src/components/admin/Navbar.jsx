@@ -24,6 +24,8 @@ export default function Navbar() {
     name = "Danh sách sản phẩm ";
   } else if (name === "/admin/customers") {
     name = "Quản lý khách hàng ";
+  } else if (name === "/admin/xem-danh-sach-don-hang") {
+    name = "Danh sách đơn hàng ";
   }
 
   const handleLogout = () => {

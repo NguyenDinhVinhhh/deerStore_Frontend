@@ -1,11 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import sanPhamApi from "../services/productApi";
 
-// Lấy danh sách tất cả sản phẩm
-export const useProduct = () => {
+export const useProduct = (keyword = "") => {
   return useQuery({
-    queryKey: ["product"],
-    queryFn: () => sanPhamApi.getAll(),
+    queryKey: ["products", keyword],
+    queryFn: async () => {
+      const res = keyword ? await sanPhamApi.search(keyword) : await sanPhamApi.getAll();
+      return Array.isArray(res) ? res : [];
+    },
     staleTime: 60 * 1000,
   });
 };

@@ -1,4 +1,11 @@
-import React, { useState, useCallback, useRef, useEffect } from "react";
+// PosNavbar.jsx
+import React, {
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  useMemo,
+} from "react";
 import {
   Container,
   Button,
@@ -25,23 +32,27 @@ const formatCurrency = (amount) => {
   const numericAmount =
     typeof amount === "number" ? amount : parseFloat(amount);
   if (isNaN(numericAmount)) return "0₫";
-
   return new Intl.NumberFormat("vi-VN").format(numericAmount) + "₫";
 };
 
 const debounce = (func, delay) => {
   let timeoutId;
   return (...args) => {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-    timeoutId = setTimeout(() => {
-      func.apply(null, args);
-    }, delay);
+    if (timeoutId) clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func.apply(null, args), delay);
   };
 };
 
-const PosNavbar = ({ onAddItemToCart, onNewOrder, onBranchChange }) => {
+const PosNavbar = ({
+  onAddItemToCart,
+  onNewOrder,
+  onBranchChange,
+  orders = [],
+  activeOrderId,
+  onSwitchOrder,
+  selectedMaChiNhanh,
+  onCloseOrder,
+}) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -53,20 +64,31 @@ const PosNavbar = ({ onAddItemToCart, onNewOrder, onBranchChange }) => {
   const [selectedWarehouseId, setSelectedWarehouseId] = useState(null);
   const [warehouseLoading, setWarehouseLoading] = useState(false);
 
+  // ✅ NEW: đã load default list chưa? (để focus là list ra ngay)
+  const [hasLoadedDefault, setHasLoadedDefault] = useState(false);
+
+  const activeOrder = useMemo(
+    () => orders.find((o) => o.id === activeOrderId),
+    [orders, activeOrderId]
+  );
+
   const fetchWarehouseByBranch = useCallback(async (maChiNhanh) => {
     if (!maChiNhanh) return;
 
     setWarehouseLoading(true);
     setSelectedWarehouseId(null);
+
+    // reset search state khi đổi kho
+    setSearchTerm("");
     setSearchResults([]);
+    setHasLoadedDefault(false);
 
     try {
       const response = await warehouseApi.getByMaChiNhanh(maChiNhanh);
       const warehouseList = response || [];
 
       if (warehouseList.length > 0) {
-        const firstWarehouseId = warehouseList[0].maKho;
-        setSelectedWarehouseId(firstWarehouseId);
+        setSelectedWarehouseId(warehouseList[0].maKho);
       } else {
         setSelectedWarehouseId(null);
       }
@@ -78,80 +100,107 @@ const PosNavbar = ({ onAddItemToCart, onNewOrder, onBranchChange }) => {
     }
   }, []);
 
-  // Tác dụng phụ 1: Load danh sách chi nhánh và tìm kho hàng ban đầu
+  // load branches + set default
   useEffect(() => {
     const chiNhanhListJson = localStorage.getItem("chiNhanhList");
-    if (chiNhanhListJson) {
-      try {
-        const list = JSON.parse(chiNhanhListJson);
-        setBranches(list);
+    if (!chiNhanhListJson) return;
 
-        if (list.length > 0) {
-          const defaultBranch = list[0];
-          setSelectedBranch(defaultBranch);
-          fetchWarehouseByBranch(defaultBranch.maChiNhanh);
+    try {
+      const list = JSON.parse(chiNhanhListJson);
+      setBranches(list);
+      if (!list.length) return;
 
-          // 🔥 ĐIỂM SỬA 1: TRUYỀN MÃ CHI NHÁNH MẶC ĐỊNH LÊN POSSCREEN KHI KHỞI TẠO
-          if (onBranchChange) {
-            onBranchChange(defaultBranch.maChiNhanh);
-          }
-        }
-      } catch (e) {
-        console.error("Lỗi khi parsing chiNhanhList từ localStorage:", e);
+      const branchFromPos = selectedMaChiNhanh
+        ? list.find((b) => b.maChiNhanh === selectedMaChiNhanh)
+        : null;
+
+      const initialBranch = branchFromPos || list[0];
+
+      setSelectedBranch(initialBranch);
+      fetchWarehouseByBranch(initialBranch.maChiNhanh);
+
+      // chỉ gọi onBranchChange nếu Pos chưa có selectedMaChiNhanh
+      if (!selectedMaChiNhanh && onBranchChange) {
+        onBranchChange(initialBranch.maChiNhanh);
       }
+    } catch (e) {
+      console.error("Lỗi parse chiNhanhList:", e);
     }
-  }, [fetchWarehouseByBranch, onBranchChange]); // Thêm onBranchChange vào dependency
+  }, [fetchWarehouseByBranch, onBranchChange, selectedMaChiNhanh]);
 
-  // Tác dụng phụ 2: Reset kết quả tìm kiếm và tải lại mặc định khi kho hàng thay đổi (Giữ nguyên)
+  // sync branch theo order/pos
   useEffect(() => {
-    if (selectedWarehouseId !== null) {
+    if (!branches.length) return;
+
+    const ma =
+      activeOrder?.maChiNhanh ??
+      selectedMaChiNhanh ??
+      selectedBranch?.maChiNhanh;
+    if (!ma) return;
+
+    const nextBranch = branches.find((b) => b.maChiNhanh === ma);
+    if (!nextBranch) return;
+
+    if (
+      !selectedBranch ||
+      selectedBranch.maChiNhanh !== nextBranch.maChiNhanh
+    ) {
+      setSelectedBranch(nextBranch);
       setSearchTerm("");
       setSearchResults([]);
-
-      if (isFocused) {
-        fetchProducts("");
-      }
+      setHasLoadedDefault(false);
+      fetchWarehouseByBranch(nextBranch.maChiNhanh);
     }
-  }, [selectedWarehouseId, isFocused]);
+  }, [
+    branches,
+    activeOrder?.maChiNhanh,
+    selectedMaChiNhanh,
+    selectedBranch,
+    fetchWarehouseByBranch,
+  ]);
 
-  // Hàm xử lý khi chọn chi nhánh
-  const handleChangeBranch = (branch) => {
+  const handleChangeBranch = async (branch) => {
     setSelectedBranch(branch);
-
-    // 🔥 ĐIỂM SỬA 2: TRUYỀN MÃ CHI NHÁNH MỚI LÊN POSSCREEN
-    if (onBranchChange) {
-      onBranchChange(branch.maChiNhanh); // Truyền maChiNhanh
-    }
-
-    // Reset trạng thái tìm kiếm ngay lập tức
     setSearchTerm("");
     setSearchResults([]);
-    fetchWarehouseByBranch(branch.maChiNhanh);
+    setHasLoadedDefault(false);
+
+    await fetchWarehouseByBranch(branch.maChiNhanh);
+    if (onBranchChange) onBranchChange(branch.maChiNhanh);
   };
 
-  // ... (fetchProducts, debouncedFetch, handleInputChange, handleInputFocus, handleInputBlur giữ nguyên)
+  // ✅ fetch products: term "" => default list
   const fetchProducts = useCallback(
-    async (query) => {
-      if (selectedWarehouseId === null || warehouseLoading) {
-        setSearchResults([]);
-        return;
-      }
+    async (term) => {
+      if (!selectedWarehouseId || warehouseLoading) return;
+
+      const query = term?.trim() || "";
 
       setLoading(true);
       try {
         let response;
-        if (!query.trim()) {
+
+        // ✅ CHƯA SEARCH → lấy hết sản phẩm trong kho
+        if (!query) {
           response = await inventoryApi.getInventoryByWarehouse(
             selectedWarehouseId
           );
-        } else {
+        }
+        // ✅ CÓ SEARCH → tìm theo keyword
+        else {
           response = await inventoryApi.searchInventory(
             query,
             selectedWarehouseId,
-            10
+            20
           );
         }
+
         setSearchResults(response || []);
+
+        // đánh dấu đã load default list
+        if (!query) {
+          setHasLoadedDefault(true);
+        }
       } catch (error) {
         console.error("Lỗi khi tìm kiếm sản phẩm:", error);
         setSearchResults([]);
@@ -169,35 +218,30 @@ const PosNavbar = ({ onAddItemToCart, onNewOrder, onBranchChange }) => {
   const handleInputChange = (e) => {
     const value = e.target.value;
     setSearchTerm(value);
+
+    // gõ => search theo keyword
     debouncedFetch(value);
   };
 
+  // ✅ focus => list ra default ngay
   const handleInputFocus = () => {
     setIsFocused(true);
-    if (
-      !searchTerm &&
-      searchResults.length === 0 &&
-      selectedWarehouseId !== null &&
-      !loading
-    ) {
+
+    // nếu chưa load default list thì load luôn
+    if (!hasLoadedDefault) {
       fetchProducts("");
     }
   };
 
-  const handleInputBlur = () => {
-    setTimeout(() => setIsFocused(false), 200);
-  };
+  const handleInputBlur = () => setTimeout(() => setIsFocused(false), 200);
 
-  // Sửa lại hàm handleSelectProduct để kiểm tra tồn kho ban đầu (Giữ nguyên)
   const handleSelectProduct = (inventoryItem) => {
     const soLuongTon = inventoryItem.soLuongTon || 0;
-
-    // KIỂM TRA TỒN KHO BẰNG 0
     if (soLuongTon <= 0) {
       alert(
         "Sản phẩm này hiện đã hết hàng (Tồn: 0) và không thể thêm vào đơn."
       );
-      return; // Không cho phép thêm
+      return;
     }
 
     const productToAdd = {
@@ -205,19 +249,16 @@ const PosNavbar = ({ onAddItemToCart, onNewOrder, onBranchChange }) => {
       tenSp: inventoryItem.sanPham.tenSp,
       maSku: inventoryItem.sanPham.maSku,
       donGia: inventoryItem.sanPham.donGia,
-      soLuongTon: soLuongTon, // Truyền tồn kho đi
+      soLuongTon,
       quantity: 1,
     };
 
     onAddItemToCart(productToAdd);
-    setSearchTerm("");
-    setSearchResults([]);
-  };
 
-  // ... (Phần JSX giữ nguyên)
-  const showResults =
-    (isFocused || searchTerm) &&
-    (searchResults.length > 0 || loading || warehouseLoading);
+    // sau khi chọn: clear search nhưng vẫn giữ default list cho lần focus sau
+    setSearchTerm("");
+    setIsFocused(false);
+  };
 
   const searchDisabled = selectedWarehouseId === null || warehouseLoading;
 
@@ -225,14 +266,11 @@ const PosNavbar = ({ onAddItemToCart, onNewOrder, onBranchChange }) => {
     <Navbar
       variant="dark"
       className="p-0"
-      style={{
-        backgroundColor: "#1e63a3",
-        borderBottom: "2px solid #0d4a7c",
-      }}
+      style={{ backgroundColor: "#1e63a3", borderBottom: "2px solid #0d4a7c" }}
     >
       <Container fluid className="px-0">
         <div className="d-flex align-items-stretch w-100">
-          {/* KHU VỰC 1: THANH TÌM KIẾM SẢN PHẨM & KẾT QUẢ */}
+          {/* SEARCH */}
           <div
             className="d-flex align-items-center p-2"
             style={{
@@ -252,6 +290,7 @@ const PosNavbar = ({ onAddItemToCart, onNewOrder, onBranchChange }) => {
                 >
                   <Search size={18} className="text-muted" />
                 </span>
+
                 <Form.Control
                   ref={searchInputRef}
                   type="search"
@@ -260,7 +299,7 @@ const PosNavbar = ({ onAddItemToCart, onNewOrder, onBranchChange }) => {
                       ? "Đang tải kho hàng..."
                       : searchDisabled
                       ? "Không tìm thấy kho hàng"
-                      : "Thêm sản phẩm vào đơn"
+                      : "Bấm để xem danh sách sản phẩm / gõ để tìm"
                   }
                   aria-label="Search"
                   className="py-2"
@@ -274,26 +313,30 @@ const PosNavbar = ({ onAddItemToCart, onNewOrder, onBranchChange }) => {
               </div>
             </Form>
 
-            {/* HIỂN THỊ KẾT QUẢ TÌM KIẾM DƯỚI DẠNG DROPDOWN OVERLAY */}
+            {/* dropdown search */}
             {isFocused && !searchDisabled && (
               <div
                 className="list-group position-absolute w-100 shadow-lg border"
                 style={{
                   top: "100%",
                   left: 0,
-                  zIndex: 1000,
+                  zIndex: 999999999,
                   maxHeight: "400px",
                   overflowY: "auto",
                 }}
               >
                 {loading || warehouseLoading ? (
                   <div className="list-group-item text-center">
-                    <Spinner animation="border" size="sm" className="me-2" />{" "}
+                    <Spinner animation="border" size="sm" className="me-2" />
                     Đang tải{warehouseLoading ? " kho hàng..." : " sản phẩm..."}
                   </div>
-                ) : searchResults.length === 0 && searchTerm === "" ? (
+                ) : searchResults.length === 0 ? (
                   <div className="list-group-item text-center text-muted">
-                    Bắt đầu nhập tên hoặc SKU để tìm kiếm...
+                    {searchTerm.trim()
+                      ? "Không tìm thấy sản phẩm phù hợp."
+                      : hasLoadedDefault
+                      ? "Không có sản phẩm."
+                      : "Bấm vào ô tìm kiếm để tải danh sách sản phẩm..."}
                   </div>
                 ) : (
                   searchResults.map((item) => (
@@ -329,24 +372,9 @@ const PosNavbar = ({ onAddItemToCart, onNewOrder, onBranchChange }) => {
                 )}
               </div>
             )}
-
-            {/* THÔNG BÁO NẾU KHÔNG TÌM THẤY KHO HÀNG */}
-            {searchDisabled && !warehouseLoading && (
-              <div
-                className="list-group position-absolute w-100 shadow-lg border"
-                style={{
-                  top: "100%",
-                  left: 0,
-                  zIndex: 1000,
-                }}
-              >
-                <div className="list-group-item text-center text-danger">
-                  Không tìm thấy kho hàng cho chi nhánh này.
-                </div>
-              </div>
-            )}
           </div>
-          {/* KHU VỰC 2 & 3 */}
+
+          {/* RIGHT */}
           <div className="d-flex align-items-center flex-grow-1">
             <Dropdown className="h-100">
               <Dropdown.Toggle
@@ -359,7 +387,7 @@ const PosNavbar = ({ onAddItemToCart, onNewOrder, onBranchChange }) => {
                   borderBottom: "none",
                 }}
               >
-                <Printer size={16} className="me-1" />{" "}
+                <Printer size={16} className="me-1" />
               </Dropdown.Toggle>
               <Dropdown.Menu>
                 <Dropdown.Item href="#/action-1">In Hóa đơn</Dropdown.Item>
@@ -367,17 +395,102 @@ const PosNavbar = ({ onAddItemToCart, onNewOrder, onBranchChange }) => {
               </Dropdown.Menu>
             </Dropdown>
 
-            <span className="text-dark me-2 ms-3 fw-bold">Đơn 1</span>
-
-            <Button
-              variant="light"
-              size="sm"
-              className="me-4 border-0 text-primary"
-              onClick={onNewOrder}
+            {/* Orders dropdown */}
+            <div
+              className="d-flex align-items-center ms-3 me-2"
+              style={{ gap: 10 }}
             >
-              <Plus size={18} />
-            </Button>
+              <div
+                className="d-flex align-items-center"
+                style={{
+                  gap: 8,
+                  padding: "6px 8px",
+                  background: "#0b4f88",
+                  borderRadius: 10,
+                }}
+              >
+                {orders.map((o) => {
+                  const isActive = o.id === activeOrderId;
 
+                  return (
+                    <button
+                      key={o.id}
+                      type="button"
+                      onClick={() => onSwitchOrder?.(o.id)}
+                      className="d-flex align-items-center"
+                      style={{
+                        border: "none",
+                        outline: "none",
+                        cursor: "pointer",
+                        padding: "8px 12px",
+                        borderRadius: 10,
+                        fontWeight: 700,
+                        background: isActive ? "#ffffff" : "#0a3d6b",
+                        color: isActive ? "#0a3d6b" : "#ffffff",
+                        gap: 10,
+                      }}
+                      title={
+                        o.cartItems?.length
+                          ? `${o.cartItems.length} SP`
+                          : "Trống"
+                      }
+                    >
+                      <span>{o.name}</span>
+
+                      {/* nút X: chỉ hiện khi có >=2 đơn */}
+                      {orders.length > 1 && orders[0].id !== o.id && (
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onCloseOrder?.(o.id);
+                          }}
+                          style={{
+                            width: 20,
+                            height: 20,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            borderRadius: 999,
+                            background: isActive
+                              ? "#e9eef5"
+                              : "rgba(255,255,255,0.18)",
+                            color: isActive ? "#0a3d6b" : "#fff",
+                            fontSize: 14,
+                            lineHeight: 1,
+                            fontWeight: 900,
+                          }}
+                          title="Đóng đơn"
+                        >
+                          ×
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* nút + tạo đơn mới */}
+              <Button
+                variant="light"
+                size="sm"
+                className="border-0 text-primary"
+                onClick={onNewOrder}
+                title="Tạo đơn mới"
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 10,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: 900,
+                }}
+              >
+                <Plus size={18} />
+              </Button>
+            </div>
+
+            {/* branch */}
             <div
               className="d-flex align-items-center text-white ms-auto h-100 px-3"
               style={{ backgroundColor: "#1e63a3" }}
@@ -391,7 +504,7 @@ const PosNavbar = ({ onAddItemToCart, onNewOrder, onBranchChange }) => {
                 >
                   <div className="text-end" style={{ fontSize: "0.8rem" }}>
                     <div className="d-flex align-items-center justify-content-end">
-                      <GeoAlt size={12} className="me-1" />{" "}
+                      <GeoAlt size={12} className="me-1" />
                       <div
                         className="fw-bold text-truncate"
                         style={{ maxWidth: "120px" }}
@@ -400,7 +513,7 @@ const PosNavbar = ({ onAddItemToCart, onNewOrder, onBranchChange }) => {
                           ? "Đang tải kho..."
                           : selectedBranch
                           ? selectedBranch.tenChiNhanh
-                          : "Đang tải..."}
+                          : "Đang tải."}
                       </div>
                     </div>
                   </div>
@@ -413,8 +526,7 @@ const PosNavbar = ({ onAddItemToCart, onNewOrder, onBranchChange }) => {
                       <Dropdown.Item
                         key={branch.maChiNhanh}
                         active={
-                          selectedBranch &&
-                          selectedBranch.maChiNhanh === branch.maChiNhanh
+                          selectedBranch?.maChiNhanh === branch.maChiNhanh
                         }
                         onClick={() => handleChangeBranch(branch)}
                       >
@@ -424,11 +536,12 @@ const PosNavbar = ({ onAddItemToCart, onNewOrder, onBranchChange }) => {
                   </Dropdown.Menu>
                 )}
               </Dropdown>
+
               <Display
                 size={20}
                 className="mx-2"
                 style={{ cursor: "pointer" }}
-              />{" "}
+              />
               <Grid3x3
                 size={20}
                 className="mx-2"

@@ -40,6 +40,27 @@ const invoiceApi = {
   updateInvoiceStatus(maHd, statusData) {
     return axios.put(`${BASE_URL}/${maHd}/status`, statusData);
   },
+
+  // 5. Lấy thông tin tổng quan kinh doanh (Dashboard)
+  // GET /api/invoices/dashboard?maChiNhanh={maChiNhanh}
+  getDashboardSummary(maChiNhanh) {
+    return axios.get(`${BASE_URL}/dashboard`, {
+      params: { maChiNhanh }
+    });
+  },
+
+  // 6. Lấy dữ liệu biểu đồ doanh thu (MỚI CẬP NHẬT)
+  // Khớp với @PostMapping("/doanh-thu/bieu-do")
+  getRevenueChartData(request) {
+    return axios.post(`${BASE_URL}/doanh-thu/bieu-do`, request);
+  },
+
+  getBranchComparison(thoiGian) {
+    return axios.get(`${BASE_URL}/doanh-thu/so-sanh-chi-nhanh`, {
+      params: { thoiGian }
+    });
+  },
+  getAll: (params) => axios.get(`${BASE_URL}`, { params }),
 };
 
 export default invoiceApi;

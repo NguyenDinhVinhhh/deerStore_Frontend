@@ -1,4 +1,5 @@
-import React, { useState, useCallback, useEffect } from "react";
+// PaymentCol.jsx
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import {
   Col,
   Card,
@@ -16,9 +17,13 @@ import {
   QrCode,
   Bank,
   BoxArrowUpRight,
+  PlusSlashMinus,
 } from "react-bootstrap-icons";
 import khachHangApi from "../../services/customersApi";
 import invoiceApi from "../../services/invoiceApi";
+import AddCustomer from "./AddCustomer";
+import VoucherModal from "./VoucherModal";
+import { toast } from "react-toastify";
 
 const PAYMENT_METHODS = [
   {
@@ -55,19 +60,14 @@ const formatCurrency = (amount) => {
     typeof absoluteAmount === "number"
       ? absoluteAmount
       : parseFloat(absoluteAmount);
-
   return sign + new Intl.NumberFormat("vi-VN").format(numericAmount) + "₫";
 };
 
 const debounce = (func, delay) => {
   let timeoutId;
   return (...args) => {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-    timeoutId = setTimeout(() => {
-      func.apply(null, args);
-    }, delay);
+    if (timeoutId) clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func.apply(null, args), delay);
   };
 };
 
@@ -76,68 +76,104 @@ const toInt = (value) => {
   return Math.round(Number(value));
 };
 
-// Lấy mã tài khoản an toàn hơn (để tránh lỗi crash nếu localStorage rỗng)
 const getUserFromStorage = () => {
   try {
     const userStr = localStorage.getItem("user");
     return userStr ? JSON.parse(userStr) : null;
-  } catch (e) {
+  } catch {
     return null;
   }
 };
 
-// ============================================================================
-// COMPONENT CHÍNH
-// ============================================================================
 const PaymentCol = ({
   cartSummary = {},
-  onSelectCustomer,
-  onCustomerDiscountChange,
   cartItems = [],
   maChiNhanh,
+
+  // ✅ NEW: per-order state persistence
+  orderId,
+  initialPaymentState,
+  onPaymentStateChange,
+  onCheckoutSuccess,
+
+  onSelectCustomer,
+  onCustomerDiscountChange,
 }) => {
-  // --- STATE ---
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [momoPaymentUrl, setMomoPaymentUrl] = useState(null);
 
-  const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS[0]);
+  // --------- local UI states (nhưng hydrate từ initialPaymentState) ----------
+  const initialMethod = useMemo(() => {
+    const key = initialPaymentState?.paymentMethodKey || "CASH";
+    return PAYMENT_METHODS.find((m) => m.key === key) || PAYMENT_METHODS[0];
+  }, [initialPaymentState?.paymentMethodKey]);
+
+  const [paymentMethod, setPaymentMethod] = useState(initialMethod);
   const [customerPaidInput, setCustomerPaidInput] = useState("");
-  const [orderNote, setOrderNote] = useState("");
+  const [orderNote, setOrderNote] = useState(
+    initialPaymentState?.orderNote || ""
+  );
+  const [itemsVoucherDiscount, setItemsVoucherDiscount] = useState(
+    initialPaymentState?.itemsVoucherDiscount || []
+  );
+  const [selectedCustomer, setSelectedCustomer] = useState(
+    initialPaymentState?.selectedCustomer || null
+  );
+
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // States tìm kiếm khách hàng
+  // search customer UI
   const [customerSearchTerm, setCustomerSearchTerm] = useState("");
   const [customerSearchResults, setCustomerSearchResults] = useState([]);
   const [customerLoading, setCustomerLoading] = useState(false);
   const [isCustomerSearchFocused, setIsCustomerSearchFocused] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [customerDiscountAmount, setCustomerDiscountAmount] = useState(0);
+  const [isShowModalAddCus, setIsShowModalAddCus] = useState(false);
+  const [isShowModalVoucher, setIsShowModalVoucher] = useState(false);
 
-  // --- TÍNH TOÁN SỐ LIỆU ---
+  // ✅ Khi đổi orderId => hydrate lại toàn bộ state theo đơn
+  useEffect(() => {
+    const key = initialPaymentState?.paymentMethodKey || "CASH";
+    setPaymentMethod(
+      PAYMENT_METHODS.find((m) => m.key === key) || PAYMENT_METHODS[0]
+    );
+    setOrderNote(initialPaymentState?.orderNote || "");
+    setItemsVoucherDiscount(initialPaymentState?.itemsVoucherDiscount || []);
+    setSelectedCustomer(initialPaymentState?.selectedCustomer || null);
+    setCustomerPaidInput("");
+    setMomoPaymentUrl(null);
+    setShowPaymentModal(false);
+    setCustomerSearchTerm("");
+    setCustomerSearchResults([]);
+  }, [orderId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // --------- money summary ----------
   const {
     totalAmount: rawTotalAmount = 0,
     discount: rawDiscount = 0,
     netPayable: rawNetPayable = 0,
   } = cartSummary;
-
   const totalAmount = toInt(rawTotalAmount);
   const discount = toInt(rawDiscount);
-  const netPayable = toInt(rawNetPayable);
 
-  // 💡 LOGIC MỚI CHO customerPaidRaw: Chỉ dùng input khi là CASH
+  const voucherDiscountTotal = useMemo(
+    () =>
+      (itemsVoucherDiscount || []).reduce((sum, v) => sum + (v.giaTri || 0), 0),
+    [itemsVoucherDiscount]
+  );
+
+  const netPayable = toInt(rawNetPayable - voucherDiscountTotal);
+
   const customerPaidRaw =
     paymentMethod.key === "CASH"
       ? parseFloat(customerPaidInput) || 0
-      : netPayable; // Nếu không phải CASH, mặc định coi như khách đã trả đủ
+      : netPayable;
 
   const customerPaid = toInt(customerPaidRaw);
-
   const change = toInt(
-    // Tiền thừa chỉ tính khi là CASH, còn lại là 0
     paymentMethod.key === "CASH" ? customerPaid - netPayable : 0
   );
 
-  // --- LOGIC KHÁCH HÀNG ---
+  // --------- customer discount ----------
   const calculateCustomerDiscount = useCallback(
     (customer, currentTotalAmount) => {
       if (customer && customer.phanTramChietKhau > 0) {
@@ -156,30 +192,49 @@ const PaymentCol = ({
         selectedCustomer,
         totalAmount
       );
-      setCustomerDiscountAmount(newDiscount);
-      if (onCustomerDiscountChange) onCustomerDiscountChange(newDiscount);
-    } else if (customerDiscountAmount !== 0) {
-      setCustomerDiscountAmount(0);
-      if (onCustomerDiscountChange) onCustomerDiscountChange(0);
+      onCustomerDiscountChange?.(newDiscount);
+    } else {
+      onCustomerDiscountChange?.(0);
     }
   }, [
     selectedCustomer,
     totalAmount,
     calculateCustomerDiscount,
     onCustomerDiscountChange,
-    customerDiscountAmount,
   ]);
 
+  // --------- persist per order ----------
+  const persistPatch = useCallback(
+    (patch) => {
+      onPaymentStateChange?.(patch);
+    },
+    [onPaymentStateChange]
+  );
+
+  useEffect(() => {
+    persistPatch({ paymentMethodKey: paymentMethod?.key });
+  }, [paymentMethod?.key, persistPatch]);
+
+  useEffect(() => {
+    persistPatch({ orderNote });
+  }, [orderNote, persistPatch]);
+
+  useEffect(() => {
+    persistPatch({ itemsVoucherDiscount });
+  }, [itemsVoucherDiscount, persistPatch]);
+
+  useEffect(() => {
+    persistPatch({ selectedCustomer });
+  }, [selectedCustomer, persistPatch]);
+
+  // --------- customer search ----------
   const fetchCustomers = useCallback(async (keyword) => {
     setCustomerLoading(true);
     try {
       let response;
-      if (!keyword.trim()) {
-        response = await khachHangApi.getAll();
-      } else {
-        response = await khachHangApi.search(keyword);
-      }
-      setCustomerSearchResults(response);
+      if (!keyword.trim()) response = await khachHangApi.getAll();
+      else response = await khachHangApi.search(keyword);
+      setCustomerSearchResults(response || []);
     } catch (error) {
       console.error("Lỗi tìm khách hàng:", error);
       setCustomerSearchResults([]);
@@ -188,9 +243,10 @@ const PaymentCol = ({
     }
   }, []);
 
-  const debouncedFetchCustomers = useCallback(debounce(fetchCustomers, 300), [
-    fetchCustomers,
-  ]);
+  const debouncedFetchCustomers = useMemo(
+    () => debounce(fetchCustomers, 300),
+    [fetchCustomers]
+  );
 
   const handleCustomerInputChange = (e) => {
     const value = e.target.value;
@@ -198,32 +254,20 @@ const PaymentCol = ({
     debouncedFetchCustomers(value);
   };
 
-  const handleSelectCustomer = (customer) => {
+  const handleSelectCustomerLocal = (customer) => {
     setSelectedCustomer(customer);
     setCustomerSearchTerm("");
     setCustomerSearchResults([]);
+
     const newDiscount = calculateCustomerDiscount(customer, totalAmount);
-    setCustomerDiscountAmount(newDiscount);
-    if (onCustomerDiscountChange) onCustomerDiscountChange(newDiscount);
-    onSelectCustomer(customer);
+    onCustomerDiscountChange?.(newDiscount);
+    onSelectCustomer?.(customer);
   };
 
   const handleRemoveCustomer = () => {
     setSelectedCustomer(null);
-    setCustomerDiscountAmount(0);
-    if (onCustomerDiscountChange) onCustomerDiscountChange(0);
-    onSelectCustomer(null);
-  };
-
-  const handleResetForm = () => {
-    setCustomerPaidInput("");
-    setPaymentMethod(PAYMENT_METHODS[0]);
-    setOrderNote("");
-    setSelectedCustomer(null);
-    setCustomerDiscountAmount(0);
-    onSelectCustomer(null);
-    if (onCustomerDiscountChange) onCustomerDiscountChange(0);
-    setMomoPaymentUrl(null);
+    onCustomerDiscountChange?.(0);
+    onSelectCustomer?.(null);
   };
 
   const handleShowPaymentModal = () => {
@@ -236,40 +280,39 @@ const PaymentCol = ({
 
   const handleChangePaymentMethod = (method) => {
     setPaymentMethod(method);
-    // Khi đổi phương thức, reset input tiền nếu không phải CASH
     if (method.key !== "CASH") {
       setCustomerPaidInput("");
     } else {
-      // Nếu là CASH, set mặc định là đủ tiền
-      if (netPayable > 0) {
-        setCustomerPaidInput(netPayable.toString());
-      }
+      if (netPayable > 0) setCustomerPaidInput(netPayable.toString());
     }
   };
 
-  // ==========================================================================
-  // 🔥 HÀM XỬ LÝ THANH TOÁN (ĐÃ UPDATE LOGIC MOMO)
-  // ==========================================================================
+  const handleResetLocalForm = () => {
+    setCustomerPaidInput("");
+    setPaymentMethod(PAYMENT_METHODS[0]);
+    setOrderNote("");
+    setSelectedCustomer(null);
+    onSelectCustomer?.(null);
+    onCustomerDiscountChange?.(0);
+    setItemsVoucherDiscount([]);
+    setMomoPaymentUrl(null);
+    setShowPaymentModal(false);
+  };
+
+  // --------- checkout ----------
   const handleFinalizeOrder = async () => {
-    // 1. Validation Frontend
     if (netPayable <= 0) {
       alert("Tổng tiền cần thanh toán phải lớn hơn 0 VND.");
       return;
     }
 
-    // Kiểm tra tiền khách đưa cho CASH
     if (paymentMethod.key === "CASH" && customerPaid < netPayable) {
-      alert("Khách chưa đưa đủ tiền mặt để thanh toán.");
       handleShowPaymentModal();
       return;
     }
 
-    // Kiểm tra User trong LocalStorage
     const user = getUserFromStorage();
     const maTaiKhoan = user?.maTk;
-
-    console.log("Đang thực hiện thanh toán với User:", user); // Debug log
-
     if (!maTaiKhoan) {
       alert(
         "LỖI ĐĂNG NHẬP: Không tìm thấy mã tài khoản.\nVui lòng đăng xuất và đăng nhập lại."
@@ -280,85 +323,61 @@ const PaymentCol = ({
     setIsProcessing(true);
 
     const FALLBACK_MA_CHI_NHANH = 1;
-
-    // 💡 LOGIC CHÍNH: Thay so_tien thành 0.00 cho Online Payment (MOMO/VISA)
     const isOnlinePayment =
       paymentMethod.key === "MOMO" || paymentMethod.key === "VISA_MASTER";
-
-    // Nếu là online, gửi 0.00 để Backend tự tính (theo kết quả test thành công).
-    // Nếu là offline/chuyển khoản, gửi netPayable (khách trả đủ).
     const paymentAmount = isOnlinePayment ? 0.0 : netPayable;
 
-    // 2. Payload
     const invoicePayload = {
       hoa_don: {
         ma_tk: maTaiKhoan,
         ma_chi_nhanh: maChiNhanh || FALLBACK_MA_CHI_NHANH,
         ma_kh: selectedCustomer?.maKh || null,
-        ma_km: null,
+        ma_km:
+          itemsVoucherDiscount.length > 0 ? itemsVoucherDiscount[0].maKm : null,
         ma_voucher_su_dung: null,
         ghi_chu: orderNote,
       },
       items: cartItems.map((item) => ({
-        ma_sp: item.ma_sp,
-        so_luong: item.so_luong,
+        ma_sp: item.maSp,
+        so_luong: item.quantity,
       })),
       payment: [
         {
           phuong_thuc: paymentMethod.key,
-          so_tien: paymentAmount, // <--- ĐÃ SỬA THÀNH finalPaymentAmount
+          so_tien: paymentAmount,
           ghi_chu: `Thanh toán qua ${paymentMethod.name}`,
         },
       ],
     };
 
     try {
-      // 3. Gọi API
-      console.log("Payload gửi đi:", invoicePayload);
       const response = await invoiceApi.createInvoice(invoicePayload);
       const result = response.data || response;
 
-      // 4. Xử lý kết quả thành công
       if (result.payUrl) {
         setMomoPaymentUrl(result.payUrl);
       } else {
-        alert("Tạo đơn hàng và thanh toán thành công!");
-        handleResetForm();
+        toast.success("Thanh toán thành công!");
+        onCheckoutSuccess?.(); // ✅ reset order ở Pos.jsx
+        handleResetLocalForm();
       }
     } catch (error) {
-      // ... (Phần bắt lỗi chi tiết giữ nguyên) ...
       console.error("🚨 LỖI GỐC (Raw Error):", error);
 
       let finalMessage = "Đã có lỗi không xác định xảy ra.";
-
       if (error.response) {
-        // Server đã trả về response (nhưng status code là lỗi 4xx, 5xx)
-        console.log("Server Response Data:", error.response.data);
-        console.log("Server Status:", error.response.status);
-
         const data = error.response.data;
-
-        // Ưu tiên lấy message từ object trả về của Backend
-        if (typeof data === "string") {
-          finalMessage = data; // Nếu backend trả về string thô
-        } else if (data?.message) {
-          finalMessage = data.message; // Chuẩn Spring Boot
-        } else if (data?.error) {
-          finalMessage = data.error;
-        } else {
-          // Nếu object lạ, chuyển thành string để đọc
-          finalMessage = JSON.stringify(data);
-        }
+        if (typeof data === "string") finalMessage = data;
+        else if (data?.message) finalMessage = data.message;
+        else if (data?.error) finalMessage = data.error;
+        else finalMessage = JSON.stringify(data);
       } else if (error.request) {
-        // Request đã gửi nhưng không nhận được phản hồi (Mất mạng, sai IP)
         finalMessage =
-          "Không thể kết nối đến Server. Vui lòng kiểm tra đường truyền Internet hoặc địa chỉ API.";
+          "Không thể kết nối đến Server. Vui lòng kiểm tra Internet hoặc địa chỉ API.";
       } else {
-        // Lỗi khi setup request
         finalMessage = error.message;
       }
 
-      // Hiển thị lỗi rõ ràng lên màn hình
       alert(`🛑 LỖI THANH TOÁN:\n\n${finalMessage}`);
     } finally {
       setIsProcessing(false);
@@ -408,14 +427,16 @@ const PaymentCol = ({
                     }
                     className="rounded-start"
                   />
-                  <Button variant="light">
+                  <Button
+                    variant="light"
+                    onClick={() => setIsShowModalAddCus(true)}
+                  >
                     <PersonPlus size={18} />
                   </Button>
                 </div>
               </Form.Group>
             )}
 
-            {/* Kết quả tìm kiếm */}
             {(isCustomerSearchFocused || customerSearchTerm) &&
               (customerSearchResults.length > 0 || customerLoading) &&
               !selectedCustomer && (
@@ -439,7 +460,7 @@ const PaymentCol = ({
                       <button
                         key={customer.maKh}
                         className="list-group-item list-group-item-action py-2"
-                        onClick={() => handleSelectCustomer(customer)}
+                        onClick={() => handleSelectCustomerLocal(customer)}
                       >
                         <div className="fw-bold">{customer.hoTen}</div>
                         <small className="text-muted">
@@ -460,23 +481,46 @@ const PaymentCol = ({
               <Col>Tổng tiền hàng:</Col>
               <Col className="text-end">{formatCurrency(totalAmount)}</Col>
             </Row>
+
             <Row className="mb-2">
               <Col>
                 Chiết khấu hạng
-                {selectedCustomer &&
-                  ` (${selectedCustomer.phanTramChietKhau}%)`}
+                {selectedCustomer
+                  ? ` (${selectedCustomer.phanTramChietKhau}%)`
+                  : ""}
               </Col>
               <Col className="text-end text-danger">
-                -{formatCurrency(customerDiscountAmount)}
+                -{formatCurrency(cartSummary.customerDiscountAmount || 0)}
               </Col>
             </Row>
-            <Row className="mb-2">
-              <Col>Chiết khấu KM</Col>
-              <Col className="text-end text-danger">
+
+            <Row className="mb-2 align-items-center">
+              <Col className="d-flex align-items-center gap-2">
+                <span>Chiết khấu KM</span>
+              </Col>
+              <Col className="text-end text-danger fw-semibold">
                 -{formatCurrency(discount)}
               </Col>
             </Row>
+
+            <Row className="mb-2 align-items-center">
+              <Col className="d-flex align-items-center gap-2">
+                <span>Mã KM</span>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-primary d-flex align-items-center gap-1"
+                  onClick={() => setIsShowModalVoucher(!isShowModalVoucher)}
+                >
+                  <PlusSlashMinus size={14} />
+                  <span>Thêm mã</span>
+                </button>
+              </Col>
+              <Col className="text-end text-danger fw-semibold">
+                -{formatCurrency(voucherDiscountTotal)}
+              </Col>
+            </Row>
           </div>
+
           <hr />
 
           {/* --- THANH TOÁN --- */}
@@ -501,11 +545,10 @@ const PaymentCol = ({
               </Col>
             </Row>
 
-            {/* 💡 CHỈ HIỂN THỊ TIỀN KHÁCH ĐƯA VÀ TIỀN THỪA KHI LÀ CASH */}
             {paymentMethod.key === "CASH" ? (
               <>
                 <Row className="mb-2">
-                  <Col>Tiền khách đưa </Col>
+                  <Col>Tiền khách đưa</Col>
                   <Col className="text-end fw-bold">
                     {formatCurrency(customerPaid)}
                   </Col>
@@ -536,6 +579,7 @@ const PaymentCol = ({
               onChange={(e) => setOrderNote(e.target.value)}
             />
           </Form.Group>
+
           <div className="d-flex justify-content-between align-items-center mt-3">
             <Button
               variant="secondary"
@@ -564,7 +608,7 @@ const PaymentCol = ({
         </Card.Footer>
       </Card>
 
-      {/* --- MODAL 1: CHỌN PHƯƠNG THỨC THANH TOÁN --- */}
+      {/* MODAL chọn phương thức */}
       <Modal
         show={showPaymentModal}
         onHide={() => setShowPaymentModal(false)}
@@ -594,7 +638,6 @@ const PaymentCol = ({
             ))}
           </ListGroup>
 
-          {/* 💡 CHỈ HIỂN THỊ INPUT KHI LÀ CASH */}
           {paymentMethod.key === "CASH" && (
             <Form.Group className="mb-3 p-3 border rounded bg-light">
               <Form.Label className="fw-bold">Tiền khách đưa</Form.Label>
@@ -622,11 +665,10 @@ const PaymentCol = ({
             </Form.Group>
           )}
 
-          {/* 💡 THÔNG BÁO CHO THANH TOÁN ONLINE */}
           {paymentMethod.key !== "CASH" && (
             <div className="alert alert-info text-center">
-              Xác nhận thanh toán **{formatCurrency(netPayable)}** qua **
-              {paymentMethod.name}**.
+              Xác nhận thanh toán <b>{formatCurrency(netPayable)}</b> qua{" "}
+              <b>{paymentMethod.name}</b>.
             </div>
           )}
 
@@ -656,7 +698,7 @@ const PaymentCol = ({
         </Modal.Footer>
       </Modal>
 
-      {/* --- MODAL 2: XÁC NHẬN MỞ MOMO --- */}
+      {/* MODAL MOMO */}
       <Modal
         show={!!momoPaymentUrl}
         onHide={() => setMomoPaymentUrl(null)}
@@ -682,7 +724,9 @@ const PaymentCol = ({
             onClick={() => {
               if (momoPaymentUrl) {
                 window.open(momoPaymentUrl, "_blank");
-                handleResetForm();
+                // reset order ở Pos
+                onCheckoutSuccess?.();
+                handleResetLocalForm();
               }
             }}
           >
@@ -696,6 +740,21 @@ const PaymentCol = ({
           </small>
         </Modal.Footer>
       </Modal>
+
+      <AddCustomer
+        show={isShowModalAddCus}
+        onClose={() => setIsShowModalAddCus(!isShowModalAddCus)}
+        onSubmit={() => fetchCustomers("")}
+      />
+
+      <VoucherModal
+        show={isShowModalVoucher}
+        onClose={() => setIsShowModalVoucher(!isShowModalVoucher)}
+        orderTotal={netPayable}
+        onApply={(selectedVouchers) =>
+          setItemsVoucherDiscount(selectedVouchers || [])
+        }
+      />
     </Col>
   );
 };

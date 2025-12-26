@@ -29,3 +29,99 @@ a:hover {
 .text-dark {
   color: #333 !important;
 }
+
+
+.chat-footer{
+  background: #fff;
+  border-top: 1px solid #e9ecef;
+  padding: 12px 12px 14px;
+}
+
+/* Tabs */
+.footer-tabs{
+  margin-bottom: 10px;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.footer-tab{
+  padding: 8px 10px !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: #6c757d !important;
+}
+
+.footer-tab.active{
+  color: #0d6efd !important;
+  border-bottom: 2px solid #0d6efd !important;
+}
+
+.tab-title{
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+/* Quick actions grid */
+.quick-grid{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (min-width: 576px){
+  .quick-grid{
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 992px){
+  .quick-grid{
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* Tile button */
+.quick-tile{
+  width: 100%;
+  min-height: 32px;
+  padding: 10px 12px;
+  text-align: left;
+
+  border: 1px solid #eef2f7;
+  background: linear-gradient(180deg, #f7f9fc 0%, #f1f4f9 100%);
+  border-radius: 12px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+  cursor: pointer;
+}
+
+.quick-tile:hover{
+  transform: translateY(-1px);
+  border-color: rgba(13,110,253,.25);
+  box-shadow: 0 8px 18px rgba(16,24,40,.08);
+}
+
+.quick-tile:active{
+  transform: translateY(0px) scale(0.99);
+}
+
+.quick-tile:focus{
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(13,110,253,.18);
+  border-color: rgba(13,110,253,.35);
+}
+
+.quick-label{
+  font-weight: 700;
+  color: #212529;
+  font-size: 0.95rem;
+  line-height: 1.15;
+}
+
+.quick-sub{
+  font-size: 0.78rem;
+  color: #6c757d;
+}

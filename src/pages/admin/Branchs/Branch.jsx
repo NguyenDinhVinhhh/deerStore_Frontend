@@ -42,7 +42,6 @@ export default function Branch({ onBack }) {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // ✅ Validate dữ liệu
   const validateForm = () => {
     const phoneRegex = /^[0-9]{10}$/;
 
@@ -65,7 +64,6 @@ export default function Branch({ onBack }) {
     return true;
   };
 
-  // ✅ Thêm / Sửa chi nhánh
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;

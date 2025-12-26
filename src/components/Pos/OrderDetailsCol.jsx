@@ -172,44 +172,40 @@ const OrderDetailsCol = ({
         )}
 
         {/* Phần Thao tác nhanh và danh sách sản phẩm */}
-        <Card.Footer
-          style={{
-            backgroundColor: "white",
-            borderTop: "1px solid #dee2e6",
-          }}
-        >
+        <Card.Footer className="chat-footer">
           {/* Tabs */}
-          <Nav variant="tabs" defaultActiveKey="quick-action" className="mb-2">
+          <Nav
+            variant="tabs"
+            defaultActiveKey="quick-action"
+            className="footer-tabs"
+          >
             <Nav.Item>
-              <Nav.Link eventKey="quick-action" className="py-1">
-                <strong className="text-primary">Thao tác nhanh</strong>
+              <Nav.Link eventKey="quick-action" className="footer-tab">
+                <span className="tab-title tab-active">Thao tác nhanh</span>
               </Nav.Link>
             </Nav.Item>
             <Nav.Item>
-              <Nav.Link eventKey="product-list" className="py-1">
-                Danh sách sản phẩm
+              <Nav.Link eventKey="product-list" className="footer-tab">
+                <span className="tab-title">Danh sách sản phẩm</span>
               </Nav.Link>
             </Nav.Item>
           </Nav>
 
-          {/* Buttons Thao tác nhanh (Sửa giao diện thành khối) */}
-          <div className="d-flex flex-wrap">
+          {/* Quick actions grid */}
+          <div className="quick-grid">
             {QUICK_ACTIONS.map((item, index) => (
-              <Button
+              <button
                 key={index}
-                // Sử dụng class tùy chỉnh cho giao diện khối
-                className="btn-quick-action m-1 p-2 border-0 text-center"
-                style={{
-                  minWidth: "150px",
-                  height: "55px",
-                  backgroundColor: "#F0F3F7", // Màu nền nhẹ theo giao diện
-                  color: "#343a40",
-                  fontWeight: 500,
-                  fontSize: "0.9rem",
-                }}
+                type="button"
+                className="quick-tile"
+                onClick={item.onClick} // nếu có
               >
-                {item.label}
-              </Button>
+                {/* Nếu có icon thì render ở đây */}
+                {/* <span className="quick-icon">{item.icon}</span> */}
+
+                <span className="quick-label">{item.label}</span>
+                <span className="quick-sub">Chạm để thực hiện</span>
+              </button>
             ))}
           </div>
         </Card.Footer>

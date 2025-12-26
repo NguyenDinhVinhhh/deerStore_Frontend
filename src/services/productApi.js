@@ -2,9 +2,17 @@ import axiosClient from "./axiosClient";
 
 const sanPhamApi = {
   getAll: () => axiosClient.get("/san-pham"),
+  
   getById: (id) => axiosClient.get(`/san-pham/${id}`),
 
- getBySku: (id) => axiosClient.get(`/san-pham/sku/${id}`),
+  getBySku: (sku) => axiosClient.get(`/san-pham/sku/${sku}`),
+
+  // BỔ SUNG: Khớp với URL Postman http://localhost:8080/api/san-pham/search?keyword=...
+  search: (keyword) => {
+    return axiosClient.get("/san-pham/search", {
+      params: { keyword },
+    });
+  },
   
   create: (formData) => {
     return axiosClient.post("/san-pham", formData, {
@@ -14,7 +22,6 @@ const sanPhamApi = {
     });
   },
 
-  // ---- UPDATE NHẬN FORM DATA TRỰC TIẾP ----
   update: (id, formData) => {
     return axiosClient.put(`/san-pham/${id}`, formData, {
       headers: {

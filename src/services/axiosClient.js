@@ -1,4 +1,4 @@
-// src/api/axiosClient.js
+
 import axios from "axios";
 
 const axiosClient = axios.create({
@@ -8,17 +8,17 @@ const axiosClient = axios.create({
   },
 });
 
-// ✅ Chèn token cho những API cần xác thực
+
 axiosClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
 
-    // Nếu có token và endpoint KHÔNG thuộc nhóm public
+
     const isPublicEndpoint =
-      config.url.includes("/san-pham") || // public
-      config.url.includes("/danh-muc") || // public
-      config.url.includes("/register") || // public
-      config.url.includes("/login"); // public
+      config.url.includes("/san-pham") || 
+      config.url.includes("/danh-muc") || 
+      config.url.includes("/register") || 
+      config.url.includes("/login"); 
 
     if (token && !isPublicEndpoint) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -29,7 +29,7 @@ axiosClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// ✅ Bắt lỗi chung
+
 axiosClient.interceptors.response.use(
   (response) => response.data,
   (error) => {
