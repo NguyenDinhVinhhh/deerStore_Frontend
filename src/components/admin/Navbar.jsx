@@ -26,6 +26,10 @@ export default function Navbar() {
     name = "Quản lý khách hàng ";
   } else if (name === "/admin/xem-danh-sach-don-hang") {
     name = "Danh sách đơn hàng ";
+  } else if (name === "/admin/nhap-hang") {
+    name = "Thiết lập tồn kho ";
+  } else if (name === "/admin/bao-cao-san-pham") {
+    name = "Báo cáo sản phẩm ";
   }
 
   const handleLogout = () => {

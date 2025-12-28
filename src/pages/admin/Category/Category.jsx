@@ -2,8 +2,9 @@ import React, { useState } from "react";
 import { Table, Button, Modal, Form, Spinner, Alert } from "react-bootstrap";
 import { useForm } from "react-hook-form";
 import categoryApi from "../../../services/categoryApi";
-import { FaArrowLeft } from "react-icons/fa";
+import { FaArrowLeft, FaEdit, FaPlus } from "react-icons/fa";
 import { useCategory } from "../../../hooks/use-category";
+import { toast } from "react-toastify"; // Nên dùng toast để báo lỗi rõ ràng
 
 function Category({ onBack }) {
   const {
@@ -16,6 +17,7 @@ function Category({ onBack }) {
 
   const [showModal, setShowModal] = useState(false);
   const [editCategory, setEditCategory] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false); // Theo dõi trạng thái gửi tin
 
   const {
     register,
@@ -24,148 +26,137 @@ function Category({ onBack }) {
     formState: { errors },
   } = useForm();
 
-  // Mở modal thêm/sửa
   const handleOpenModal = (category = null) => {
     setEditCategory(category);
-    if (category) {
-      reset({
-        tenDanhMuc: category.tenDanhMuc,
-        moTa: category.moTa,
-      });
-    } else {
-      reset({
-        tenDanhMuc: "",
-        moTa: "",
-      });
-    }
+    reset({
+      tenDanhMuc: category ? category.tenDanhMuc : "",
+      moTa: category ? category.moTa : "",
+    });
     setShowModal(true);
   };
 
   const handleCloseModal = () => {
     setShowModal(false);
     setEditCategory(null);
+    setIsSubmitting(false);
   };
 
-  // Thêm hoặc sửa danh mục
   const onSubmit = async (data) => {
+    setIsSubmitting(true);
     try {
       if (editCategory) {
+        // SỬA: Đảm bảo editCategory.maDanhMuc có giá trị
         await categoryApi.update(editCategory.maDanhMuc, data);
+        toast.success("Cập nhật danh mục thành công!");
       } else {
+        // THÊM
         await categoryApi.create(data);
+        toast.success("Thêm danh mục thành công!");
       }
 
-      // 3. Thay thế fetchCategories() bằng refetchCategories()
-      refetchCategories();
+      await refetchCategories(); // Chờ refetch xong mới đóng modal
       handleCloseModal();
     } catch (error) {
-      console.error("Lỗi thêm/sửa danh mục:", error);
-      alert("Lỗi khi lưu danh mục. Vui lòng kiểm tra console.");
+      console.error("Lỗi API:", error);
+      const msg = error.response?.data?.message || "Lỗi khi lưu dữ liệu";
+      alert(msg); // Kiểm tra xem có phải lỗi 403 không
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  // Xử lý trạng thái Loading và Error
-  if (loadingCategory) {
+  if (loadingCategory)
     return (
       <div className="text-center p-5">
         <Spinner animation="border" />
-        <p className="mt-2">Đang tải danh sách Danh Mục...</p>
       </div>
     );
-  }
-
-  if (isError) {
+  if (isError)
     return (
-      <div className="text-center p-5">
-        <Alert variant="danger">
-          Lỗi khi tải dữ liệu Danh Mục: {error.message}
-        </Alert>
-      </div>
+      <Alert variant="danger" className="m-5">
+        Lỗi: {error.message}
+      </Alert>
     );
-  }
 
   return (
     <div className="container mt-4">
-      {/* Header */}
-      <div className="d-flex align-items-center justify-content-between mb-3">
-        <button className="btn btn-light border" onClick={onBack}>
-          <FaArrowLeft className="me-2" /> Quay lại
-        </button>
-        <h2 className="text-center flex-grow-1 m-0">Quản lý Danh Mục</h2>
+      <div className="d-flex align-items-center mb-4">
+        <Button variant="light" className="border me-3" onClick={onBack}>
+          <FaArrowLeft />
+        </Button>
+        <h2 className="mb-0 flex-grow-1">Quản lý Danh Mục</h2>
         <Button onClick={() => handleOpenModal()} variant="primary">
-          Thêm Danh Mục
+          <FaPlus className="me-2" />
+          Thêm mới
         </Button>
       </div>
 
-      <Table striped bordered hover>
-        <thead>
+      <Table striped bordered hover responsive>
+        <thead className="table-dark">
           <tr>
-            <th>Mã Danh Mục</th>
+            <th>ID</th>
             <th>Tên Danh Mục</th>
             <th>Mô Tả</th>
-            <th>Hành Động</th>
+            <th className="text-center">Hành Động</th>
           </tr>
         </thead>
         <tbody>
-          {categories.length === 0 ? (
-            <tr>
-              <td colSpan="4" className="text-center text-muted">
-                Không có danh mục nào.
+          {categories.map((c) => (
+            <tr key={c.maDanhMuc}>
+              <td>{c.maDanhMuc}</td>
+              <td className="fw-bold">{c.tenDanhMuc}</td>
+              <td>{c.moTa || "—"}</td>
+              <td className="text-center">
+                <Button
+                  size="sm"
+                  variant="warning"
+                  onClick={() => handleOpenModal(c)}
+                >
+                  <FaEdit /> Sửa
+                </Button>
               </td>
             </tr>
-          ) : (
-            categories.map((c) => (
-              <tr key={c.maDanhMuc}>
-                <td>{c.maDanhMuc}</td>
-                <td>{c.tenDanhMuc}</td>
-                <td>{c.moTa || "—"}</td>
-                <td>
-                  <Button
-                    size="sm"
-                    variant="warning"
-                    onClick={() => handleOpenModal(c)}
-                  >
-                    Sửa
-                  </Button>
-                </td>
-              </tr>
-            ))
-          )}
+          ))}
         </tbody>
       </Table>
 
-      {/* Modal Thêm/Sửa Danh Mục */}
-      <Modal show={showModal} onHide={handleCloseModal}>
-        <Modal.Header closeButton>
-          <Modal.Title>
-            {editCategory ? "Sửa Danh Mục" : "Thêm Danh Mục"}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form onSubmit={handleSubmit(onSubmit)}>
-            <Form.Group className="mb-2">
+      <Modal show={showModal} onHide={handleCloseModal} centered>
+        <Form onSubmit={handleSubmit(onSubmit)}>
+          <Modal.Header closeButton>
+            <Modal.Title>
+              {editCategory ? "Cập nhật danh mục" : "Thêm danh mục mới"}
+            </Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <Form.Group className="mb-3">
               <Form.Label>Tên Danh Mục</Form.Label>
               <Form.Control
                 type="text"
+                isInvalid={!!errors.tenDanhMuc}
                 {...register("tenDanhMuc", {
-                  required: "Tên danh mục là bắt buộc",
+                  required: "Vui lòng nhập tên danh mục",
                 })}
               />
-              {errors.tenDanhMuc && (
-                <span className="text-danger">{errors.tenDanhMuc.message}</span>
-              )}
+              <Form.Control.Feedback type="invalid">
+                {errors.tenDanhMuc?.message}
+              </Form.Control.Feedback>
             </Form.Group>
 
             <Form.Group className="mb-3">
               <Form.Label>Mô Tả</Form.Label>
-              <Form.Control type="text" {...register("moTa")} />
+              <Form.Control as="textarea" rows={3} {...register("moTa")} />
             </Form.Group>
-
-            <Button variant="primary" type="submit">
-              {editCategory ? "Cập nhật" : "Thêm Danh Mục"}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={handleCloseModal}>
+              Hủy
             </Button>
-          </Form>
-        </Modal.Body>
+            <Button variant="primary" type="submit" disabled={isSubmitting}>
+              {isSubmitting ? <Spinner size="sm" className="me-2" /> : null}
+              {editCategory ? "Lưu thay đổi" : "Tạo danh mục"}
+            </Button>
+          </Modal.Footer>
+        </Form>
       </Modal>
     </div>
   );

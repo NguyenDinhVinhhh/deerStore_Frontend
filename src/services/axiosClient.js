@@ -17,6 +17,8 @@ axiosClient.interceptors.request.use(
     const isPublicEndpoint =
       config.url.includes("/san-pham") || 
       config.url.includes("/danh-muc") || 
+      config.url.includes("/chi-nhanh") || 
+      config.url.includes("/lich-su-mua-hang") || 
       config.url.includes("/register") || 
       config.url.includes("/login"); 
 

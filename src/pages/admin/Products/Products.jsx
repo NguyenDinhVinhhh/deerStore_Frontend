@@ -21,6 +21,9 @@ import {
   FaTimes,
   FaCamera,
   FaInbox,
+  FaTools,
+  FaClock,
+  FaStar,
 } from "react-icons/fa";
 import Swal from "sweetalert2";
 
@@ -53,15 +56,12 @@ export default function ProductList() {
     formState: { errors },
   } = useForm();
 
-  // Theo dõi file ảnh và tạo URL xem trước
   const imageFile = watch("hinhAnhFile");
   useEffect(() => {
     if (imageFile && imageFile.length > 0) {
       const file = imageFile[0];
       const objectUrl = URL.createObjectURL(file);
       setPreviewImage(objectUrl);
-
-      // Giải phóng bộ nhớ khi file thay đổi hoặc component unmount
       return () => URL.revokeObjectURL(objectUrl);
     }
   }, [imageFile]);
@@ -71,21 +71,23 @@ export default function ProductList() {
     setPreviewImage(product?.hinhAnhUrl || null);
     if (product) {
       reset({
-        tenSp: product.tenSp, // Form nội bộ dùng tenSp
+        tenSp: product.tenSp,
         maSku: product.maSku,
-        donGia: product.donGia,
-        giaVon: product.giaVon,
         moTa: product.moTa || "",
         maDanhMuc: product.maDanhMuc,
+        soManhGhep: product.soManhGhep || "",
+        thoiGianGhep: product.thoiGianGhep || "",
+        doKho: product.doKho || "", // Backend trả về số, Form sẽ tự khớp với value của option
       });
     } else {
       reset({
         tenSp: "",
         maSku: "",
-        donGia: 0,
-        giaVon: 0,
         moTa: "",
         maDanhMuc: "",
+        soManhGhep: "",
+        thoiGianGhep: "",
+        doKho: "",
       });
     }
     setView("edit");
@@ -100,49 +102,46 @@ export default function ProductList() {
     try {
       const formData = new FormData();
 
-      // Chuyển tất cả về String để khớp với cách nhận @RequestParam("...") String của bạn
       formData.append("tenSP", data.tenSp);
       formData.append("maSku", data.maSku);
-      formData.append("donGia", data.donGia.toString());
-      formData.append("giaVon", data.giaVon.toString());
       formData.append("moTa", data.moTa || "");
       formData.append("maDanhMuc", data.maDanhMuc.toString());
 
+      if (data.soManhGhep) formData.append("soManhGhep", data.soManhGhep);
+      if (data.thoiGianGhep) formData.append("thoiGianGhep", data.thoiGianGhep);
+
+      // Chuyển đổi doKho sang Integer/Tinyint trước khi gửi
+      if (data.doKho) {
+        formData.append("doKho", parseInt(data.doKho));
+      }
+
       if (data.hinhAnhFile && data.hinhAnhFile[0]) {
-        // Key phải khớp chính xác với @RequestPart hoặc @RequestParam("hinhAnhFile")
         formData.append("hinhAnhFile", data.hinhAnhFile[0]);
       }
 
       if (selectedProduct) {
-        await sanPhamApi.update(selectedProduct.maSp, formData);
+        await sanPhamApi.updateThongTin(selectedProduct.maSp, formData);
         Swal.fire("Thành công", "Cập nhật sản phẩm hoàn tất", "success");
       } else {
         await sanPhamApi.create(formData);
         Swal.fire("Thành công", "Đã thêm sản phẩm mới", "success");
       }
+
       refetch();
       handleBack();
     } catch (error) {
-      if (error.response?.status === 403) {
-        Swal.fire(
-          "Lỗi 403",
-          "Bạn không có quyền 'THEM_SAN_PHAM' hoặc Token hết hạn.",
-          "error"
-        );
-      } else {
-        // Hiển thị nội dung lỗi từ các đoạn catch (badRequest) ở Backend của bạn
-        const serverMessage = error.response?.data;
-        Swal.fire(
-          "Lỗi",
-          typeof serverMessage === "string"
-            ? serverMessage
-            : "Thao tác thất bại",
-          "error"
-        );
-      }
+      const serverMessage =
+        error.response?.data?.message || error.response?.data;
+      Swal.fire(
+        "Lỗi",
+        typeof serverMessage === "string" ? serverMessage : "Thao tác thất bại",
+        "error"
+      );
     }
   };
+
   if (view === "list") {
+    // ... Phần giao diện danh sách giữ nguyên ...
     return (
       <div className="p-4 bg-light min-vh-100">
         <div className="d-flex justify-content-between align-items-center mb-4">
@@ -265,9 +264,11 @@ export default function ProductList() {
       </div>
 
       <Form className="p-4">
-        <Row>
+        {/* Sử dụng g-4 để tạo khoảng cách đều giữa các cột */}
+        <Row className="g-4">
           <Col md={7}>
-            <Card className="border-0 shadow-sm p-4 mb-4">
+            {/* Thêm h-100 để card bên trái chiếm hết không gian nếu cột phải dài hơn */}
+            <Card className="border-0 shadow-sm p-4 h-100">
               <h5 className="fw-bold mb-4">Thông tin chung</h5>
               <Form.Group className="mb-3">
                 <Form.Label className="fw-medium">
@@ -309,65 +310,103 @@ export default function ProductList() {
                   </Form.Group>
                 </Col>
               </Row>
-              <Form.Group className="mb-3">
+
+              <hr className="my-4 opacity-25" />
+              <h6 className="fw-bold mb-3 text-secondary">
+                Thông số kỹ thuật sản phẩm
+              </h6>
+              <Row>
+                <Col md={4}>
+                  <Form.Group className="mb-3">
+                    <Form.Label className="fw-medium">
+                      <FaTools className="me-1" /> Số mảnh ghép
+                    </Form.Label>
+                    <Form.Control type="number" {...register("soManhGhep")} />
+                  </Form.Group>
+                </Col>
+                <Col md={4}>
+                  <Form.Group className="mb-3">
+                    <Form.Label className="fw-medium">
+                      <FaClock className="me-1" /> Thời gian ghép
+                    </Form.Label>
+                    <Form.Control type="text" {...register("thoiGianGhep")} />
+                  </Form.Group>
+                </Col>
+                <Col md={4}>
+                  <Form.Group className="mb-3">
+                    <Form.Label className="fw-medium">
+                      <FaStar className="me-1" /> Độ khó
+                    </Form.Label>
+                    <Form.Select {...register("doKho")}>
+                      <option value="">Chọn độ khó</option>
+                      <option value="1">Dễ</option>
+                      <option value="2">Trung bình</option>
+                      <option value="3">Trung bình khó</option>
+                      <option value="4">Khó</option>
+                      <option value="5">Rất khó</option>
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+              </Row>
+
+              <Form.Group className="mb-3 mt-2 flex-grow-1 d-flex flex-column">
                 <Form.Label className="fw-medium">Mô tả</Form.Label>
-                <Form.Control as="textarea" rows={5} {...register("moTa")} />
+                {/* Sử dụng flex-grow-1 để textarea tự động giãn ra lấp đầy khoảng trống */}
+                <Form.Control
+                  as="textarea"
+                  className="flex-grow-1"
+                  style={{ minHeight: "150px" }}
+                  {...register("moTa")}
+                />
               </Form.Group>
             </Card>
           </Col>
 
           <Col md={5}>
-            <Card className="border-0 shadow-sm p-4 mb-4 text-center">
-              <h5 className="fw-bold mb-4 text-start">Hình ảnh sản phẩm</h5>
-              <div
-                className="border rounded d-flex flex-column align-items-center justify-content-center bg-light mb-3"
-                style={{
-                  height: "250px",
-                  cursor: "pointer",
-                  overflow: "hidden",
-                }}
-                onClick={() => document.getElementById("fileInput").click()}
-              >
-                {previewImage ? (
-                  <Image
-                    src={previewImage}
-                    className="w-100 h-100 object-fit-cover"
-                  />
-                ) : (
-                  <div className="text-muted">
-                    <FaCamera size={40} className="mb-2" />
-                    <p className="small mb-0">Nhấn để tải ảnh lên</p>
-                  </div>
-                )}
-              </div>
-              <Form.Control
-                id="fileInput"
-                type="file"
-                accept="image/*"
-                className="d-none"
-                {...register("hinhAnhFile")}
-              />
-            </Card>
+            {/* Cột phải: Dùng d-flex flex-column h-100 để các con bên trong giãn theo chiều cao */}
+            <div className="d-flex flex-column h-100 g-4">
+              <Card className="border-0 shadow-sm p-4 mb-4 text-center">
+                <h5 className="fw-bold mb-4 text-start">Hình ảnh sản phẩm</h5>
+                <div
+                  className="border rounded d-flex flex-column align-items-center justify-content-center bg-light mb-3"
+                  style={{
+                    height: "300px",
+                    cursor: "pointer",
+                    overflow: "hidden",
+                  }}
+                  onClick={() => document.getElementById("fileInput").click()}
+                >
+                  {previewImage ? (
+                    <Image
+                      src={previewImage}
+                      className="w-100 h-100 object-fit-cover"
+                    />
+                  ) : (
+                    <div className="text-muted">
+                      <FaCamera size={40} className="mb-2" />
+                      <p className="small mb-0">Nhấn để tải ảnh lên</p>
+                    </div>
+                  )}
+                </div>
+                <Form.Control
+                  id="fileInput"
+                  type="file"
+                  accept="image/*"
+                  className="d-none"
+                  {...register("hinhAnhFile")}
+                />
+              </Card>
 
-            <Card className="border-0 shadow-sm p-4">
-              <h5 className="fw-bold mb-4">Giá bán</h5>
-              <Form.Group className="mb-3">
-                <Form.Label className="text-muted">Giá bán lẻ (VND)</Form.Label>
-                <Form.Control
-                  type="number"
-                  {...register("donGia")}
-                  className="fw-bold text-primary fs-5"
-                />
-              </Form.Group>
-              <Form.Group>
-                <Form.Label className="text-muted">Giá vốn (VND)</Form.Label>
-                <Form.Control
-                  type="number"
-                  {...register("giaVon")}
-                  className="fw-bold text-danger fs-5"
-                />
-              </Form.Group>
-            </Card>
+              {/* Card thông tin giá: Dùng flex-grow-1 để card này kéo dài xuống đáy cột */}
+              <Card className="border-0 shadow-sm p-4 bg-white flex-grow-1 d-flex align-items-center justify-content-center">
+                <div className="text-center">
+                  <p className="text-muted mb-0 italic">
+                    * Thông tin giá bán và giá vốn sẽ được quản lý tại phần{" "}
+                    <strong>Điều chỉnh giá</strong>.
+                  </p>
+                </div>
+              </Card>
+            </div>
           </Col>
         </Row>
       </Form>

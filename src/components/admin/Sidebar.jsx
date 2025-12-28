@@ -124,7 +124,7 @@ export default function Sidebar() {
           label="Báo cáo"
           active={pathname.includes("/admin/bao-cao")}
         >
-          <SubItem path="/admin/bao-cao" label="Báo cáo bán hàng" />
+          <SubItem path="/admin/bao-cao-san-pham" label="Báo cáo sản phẩm" />
           <SubItem path="/admin/bao-cao-nhap-hang" label="Báo cáo nhập hàng" />
           <SubItem path="/admin/bao-cao-kho" label="Báo cáo kho" />
           <SubItem

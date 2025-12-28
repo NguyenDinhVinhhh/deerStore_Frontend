@@ -1,72 +1,47 @@
-
 import axios from "./axiosClient"; 
 
 const BASE_URL = "/ton-kho";
 
 const inventoryApi = {
-  //thiết lập tồn kho ban đầu
-  updateInventory(data) {
-    return axios.post(`${BASE_URL}`, data);
-  },
-
-  // lấy tổng tồn kho của 1 sản phẩm 
-  getTotalStockByProduct(maSp) {
-    return axios.get(`${BASE_URL}/products/${maSp}/total`);
-  },
-
-  // lấy chi tiết tồn kho của từng sản phẩm 
-  getInventoryDetailsByProduct(maSp) {
-    return axios.get(`${BASE_URL}/products/${maSp}/details`);
-  },
-
-  /// lấy toàn bộ tồn kho trong 1 kho 
+    // 4. Lấy danh sách tồn kho của toàn bộ sản phẩm trong 1 kho
   getInventoryByWarehouse(maKho) {
     return axios.get(`${BASE_URL}/warehouses/${maKho}`);
   },
 
-  // điều chỉnh tồn kho nhập hoặc xuất
+  // 1. Lấy danh sách sản phẩm kèm trạng thái tồn kho (Dùng ID Kho để lọc)
+  // GET /api/ton-kho?maKho=101
+  getInventoryWithStatus: (maKho) => 
+    axios.get(`${BASE_URL}`, { params: { maKho } }),
+
+  // 2. Thiết lập tồn kho ban đầu (POST)
+  // Payload: { maSp, maKho, soLuongTon, ghiChu }
+  setupInitialStock(data) {
+    return axios.post(`${BASE_URL}`, data);
+  },
+
+  // 3. Lấy kho hàng từ mã chi nhánh (Để lấy maKho từ maChiNhanh)
+  // GET /api/kho-hang/chi-nhanh/{maCn}
+  getWarehousesByBranch: (maCn) => 
+    axios.get(`/kho-hang/chi-nhanh/${maCn}`),
+
+  // 4. Điều chỉnh tồn kho (Dùng cho API Tăng/Giảm sau này)
   adjustInventory(data) {
     return axios.put(`${BASE_URL}/adjust`, data);
   },
 
-  // báo cáo tồn kho theo danh mục 
-  getReportByCategory() {
-    return axios.get(`${BASE_URL}/report/by-category`);
-  },
+  // --- Các hàm báo cáo & chi tiết (Giữ nguyên logic của bạn) ---
 
-  // =====================================
-  // 7. TOP sản phẩm tồn kho thấp nhất tất cả kho
-  // GET /api/ton-kho/report/low-stock?limit=10
-  // =====================================
-  getTopLowStockProducts(limit = 10) {
-    return axios.get(`${BASE_URL}/report/low-stock?limit=${limit}`);
-  },
+  getTotalStockByProduct: (maSp) => 
+    axios.get(`${BASE_URL}/products/${maSp}/total`),
 
-  // =====================================
-  // 8. TOP sản phẩm tồn kho thấp nhất theo từng kho
-  // GET /api/ton-kho/report/warehouses/{maKho}/low-stock
-  // =====================================
-  getTopLowStockProductsByWarehouse(maKho, limit = 10) {
-    return axios.get(
-      `${BASE_URL}/report/warehouses/${maKho}/low-stock?limit=${limit}`
-    );
-  },
+  getInventoryDetailsByProduct: (maSp) => 
+    axios.get(`${BASE_URL}/products/${maSp}/details`),
 
-  // =====================================
-  // 9. TOP sản phẩm tồn kho thấp nhất theo chi nhánh
-  // GET /api/ton-kho/report/branches/{maCn}/low-stock
-  // =====================================
-  getTopLowStockProductsByBranch(maCn, limit = 10) {
-    return axios.get(
-      `${BASE_URL}/report/branches/${maCn}/low-stock?limit=${limit}`
-    );
-  },
+  getTopLowStockProducts: (limit = 10) => 
+    axios.get(`${BASE_URL}/report/low-stock?limit=${limit}`),
 
-  searchInventory(query, maKho, limit = 10) {
-    return axios.get(
-      `${BASE_URL}/search?query=${query}&maKho=${maKho}&limit=${limit}`
-    );
-  },
+  getTopLowStockProductsByBranch: (maCn, limit = 10) => 
+    axios.get(`${BASE_URL}/report/branches/${maCn}/low-stock?limit=${limit}`),
 };
 
 export default inventoryApi;
