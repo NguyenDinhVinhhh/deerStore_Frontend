@@ -2,17 +2,18 @@ import React, { useEffect, useState } from "react";
 import {
   Container,
   Table,
-  Badge,
   Card,
   Spinner,
   Accordion,
-  ListGroup,
+  Row,
+  Col,
 } from "react-bootstrap";
 import {
   FaHistory,
   FaCalendarAlt,
-  FaMoneyBillWave,
+  FaTag,
   FaBoxOpen,
+  FaReceipt,
 } from "react-icons/fa";
 import historyApi from "../../services/historyApi";
 
@@ -24,17 +25,17 @@ const PurchaseHistory = () => {
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        // Lấy thông tin user từ localStorage để lấy số điện thoại
         const userData = JSON.parse(localStorage.getItem("user"));
-        const sdt = userData?.maKhachHang;
-        console.log("a", sdt);
-        if (!sdt) {
-          setError("Không tìm thấy thông tin số điện thoại người dùng.");
+        // Sử dụng maKhachHang (ID) đã được thống nhất từ các bước trước
+        const maKh = userData?.maKhachHang;
+
+        if (!maKh) {
+          setError("Không tìm thấy thông tin định danh người dùng.");
           setLoading(false);
           return;
         }
 
-        const response = await historyApi.getHistory(sdt);
+        const response = await historyApi.getHistory(maKh);
         setHistory(response);
       } catch (err) {
         console.error("Error fetching history:", err);
@@ -47,15 +48,13 @@ const PurchaseHistory = () => {
     fetchHistory();
   }, []);
 
-  // Hàm định dạng tiền tệ VND
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("vi-VN", {
       style: "currency",
       currency: "VND",
-    }).format(amount);
+    }).format(amount || 0);
   };
 
-  // Hàm định dạng ngày tháng
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleString("vi-VN");
@@ -85,32 +84,40 @@ const PurchaseHistory = () => {
           <p className="text-muted">Bạn chưa có đơn hàng nào.</p>
         </div>
       ) : (
-        <Accordion defaultActiveKey="0 shadow-sm">
+        <Accordion defaultActiveKey="0">
           {history.map((order, index) => (
             <Accordion.Item
               eventKey={index.toString()}
               key={order.maHoaDon}
-              className="mb-3 border rounded"
+              className="mb-3 border rounded shadow-sm"
             >
               <Accordion.Header>
                 <div className="d-flex justify-content-between w-100 pe-3 align-items-center">
                   <div>
                     <span className="fw-bold text-primary">
-                      #HD{order.maHoaDon}
+                      <FaReceipt className="me-2" />
+                      Mã đơn: #{order.maHoaDon}
                     </span>
-                    <span className="mx-3 text-muted small">
+                    <span className="mx-3 text-muted small d-none d-md-inline">
                       <FaCalendarAlt className="me-1" />{" "}
                       {formatDate(order.ngayMua)}
                     </span>
                   </div>
-                  <div className="fw-bold text-danger">
-                    {formatCurrency(order.tongTien)}
+                  <div className="text-end">
+                    <div className="fw-bold text-danger fs-5">
+                      {formatCurrency(order.thanhTien)}
+                    </div>
+                    {order.giamGia > 0 && (
+                      <small className="text-success text-decoration-line-through">
+                        {formatCurrency(order.tongTienGoc)}
+                      </small>
+                    )}
                   </div>
                 </div>
               </Accordion.Header>
               <Accordion.Body>
-                <h6 className="fw-bold mb-3 border-bottom pb-2">
-                  Chi tiết sản phẩm
+                <h6 className="fw-bold mb-3 border-bottom pb-2 text-secondary">
+                  CHI TIẾT ĐƠN HÀNG
                 </h6>
                 <Table responsive hover borderless className="align-middle">
                   <thead className="bg-light">
@@ -137,17 +144,38 @@ const PurchaseHistory = () => {
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot>
-                    <tr className="border-top">
-                      <td colSpan="3" className="text-end fw-bold pt-3">
-                        Tổng cộng:
-                      </td>
-                      <td className="text-end text-danger fw-bold fs-5 pt-3">
-                        {formatCurrency(order.tongTien)}
-                      </td>
-                    </tr>
-                  </tfoot>
                 </Table>
+
+                <Card className="bg-light border-0 mt-3">
+                  <Card.Body>
+                    <Row className="mb-2">
+                      <Col xs={8} className="text-end text-muted">
+                        Tổng tiền hàng:
+                      </Col>
+                      <Col xs={4} className="text-end">
+                        {formatCurrency(order.tongTienGoc)}
+                      </Col>
+                    </Row>
+                    {order.giamGia > 0 && (
+                      <Row className="mb-2 text-success">
+                        <Col xs={8} className="text-end">
+                          <FaTag className="me-1" /> Giảm giá:
+                        </Col>
+                        <Col xs={4} className="text-end">
+                          -{formatCurrency(order.giamGia)}
+                        </Col>
+                      </Row>
+                    )}
+                    <Row className="fw-bold fs-5 border-top pt-2">
+                      <Col xs={8} className="text-end">
+                        Tổng thanh toán:
+                      </Col>
+                      <Col xs={4} className="text-end text-danger">
+                        {formatCurrency(order.thanhTien)}
+                      </Col>
+                    </Row>
+                  </Card.Body>
+                </Card>
               </Accordion.Body>
             </Accordion.Item>
           ))}

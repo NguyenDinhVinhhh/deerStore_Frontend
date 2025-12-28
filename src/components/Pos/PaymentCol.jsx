@@ -1,4 +1,3 @@
-// PaymentCol.jsx
 import React, { useState, useCallback, useEffect, useMemo } from "react";
 import {
   Col,
@@ -9,6 +8,7 @@ import {
   Spinner,
   Modal,
   ListGroup,
+  Badge,
 } from "react-bootstrap";
 import {
   PersonPlus,
@@ -89,20 +89,16 @@ const PaymentCol = ({
   cartSummary = {},
   cartItems = [],
   maChiNhanh,
-
-  // ✅ NEW: per-order state persistence
   orderId,
   initialPaymentState,
   onPaymentStateChange,
   onCheckoutSuccess,
-
   onSelectCustomer,
   onCustomerDiscountChange,
 }) => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [momoPaymentUrl, setMomoPaymentUrl] = useState(null);
 
-  // --------- local UI states (nhưng hydrate từ initialPaymentState) ----------
   const initialMethod = useMemo(() => {
     const key = initialPaymentState?.paymentMethodKey || "CASH";
     return PAYMENT_METHODS.find((m) => m.key === key) || PAYMENT_METHODS[0];
@@ -121,8 +117,6 @@ const PaymentCol = ({
   );
 
   const [isProcessing, setIsProcessing] = useState(false);
-
-  // search customer UI
   const [customerSearchTerm, setCustomerSearchTerm] = useState("");
   const [customerSearchResults, setCustomerSearchResults] = useState([]);
   const [customerLoading, setCustomerLoading] = useState(false);
@@ -130,7 +124,6 @@ const PaymentCol = ({
   const [isShowModalAddCus, setIsShowModalAddCus] = useState(false);
   const [isShowModalVoucher, setIsShowModalVoucher] = useState(false);
 
-  // ✅ Khi đổi orderId => hydrate lại toàn bộ state theo đơn
   useEffect(() => {
     const key = initialPaymentState?.paymentMethodKey || "CASH";
     setPaymentMethod(
@@ -144,22 +137,36 @@ const PaymentCol = ({
     setShowPaymentModal(false);
     setCustomerSearchTerm("");
     setCustomerSearchResults([]);
-  }, [orderId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [orderId, initialPaymentState]);
 
-  // --------- money summary ----------
   const {
     totalAmount: rawTotalAmount = 0,
     discount: rawDiscount = 0,
     netPayable: rawNetPayable = 0,
   } = cartSummary;
   const totalAmount = toInt(rawTotalAmount);
-  const discount = toInt(rawDiscount);
 
-  const voucherDiscountTotal = useMemo(
-    () =>
-      (itemsVoucherDiscount || []).reduce((sum, v) => sum + (v.giaTri || 0), 0),
-    [itemsVoucherDiscount]
-  );
+  // ✅ ĐÃ SỬA: Logic tính toán số tiền giảm thực tế từ Voucher (PERCENT hoặc FIXED)
+  const voucherDiscountTotal = useMemo(() => {
+    return (itemsVoucherDiscount || []).reduce((sum, v) => {
+      let discountValue = 0;
+      if (v.loaiKm === "PERCENT") {
+        // Tính theo phần trăm đơn hàng
+        discountValue = toInt((totalAmount * (v.giaTri || 0)) / 100);
+        // Áp dụng giới hạn giảm tối đa (Max Cap) nếu có
+        if (
+          v.gioiHanTienGiamToiDa > 0 &&
+          discountValue > v.gioiHanTienGiamToiDa
+        ) {
+          discountValue = v.gioiHanTienGiamToiDa;
+        }
+      } else {
+        // Giảm số tiền cố định
+        discountValue = toInt(v.giaTri || 0);
+      }
+      return sum + discountValue;
+    }, 0);
+  }, [itemsVoucherDiscount, totalAmount]);
 
   const netPayable = toInt(rawNetPayable - voucherDiscountTotal);
 
@@ -167,13 +174,11 @@ const PaymentCol = ({
     paymentMethod.key === "CASH"
       ? parseFloat(customerPaidInput) || 0
       : netPayable;
-
   const customerPaid = toInt(customerPaidRaw);
   const change = toInt(
     paymentMethod.key === "CASH" ? customerPaid - netPayable : 0
   );
 
-  // --------- customer discount ----------
   const calculateCustomerDiscount = useCallback(
     (customer, currentTotalAmount) => {
       if (customer && customer.phanTramChietKhau > 0) {
@@ -203,7 +208,6 @@ const PaymentCol = ({
     onCustomerDiscountChange,
   ]);
 
-  // --------- persist per order ----------
   const persistPatch = useCallback(
     (patch) => {
       onPaymentStateChange?.(patch);
@@ -212,22 +216,20 @@ const PaymentCol = ({
   );
 
   useEffect(() => {
-    persistPatch({ paymentMethodKey: paymentMethod?.key });
-  }, [paymentMethod?.key, persistPatch]);
+    persistPatch({
+      paymentMethodKey: paymentMethod?.key,
+      orderNote,
+      itemsVoucherDiscount,
+      selectedCustomer,
+    });
+  }, [
+    paymentMethod?.key,
+    orderNote,
+    itemsVoucherDiscount,
+    selectedCustomer,
+    persistPatch,
+  ]);
 
-  useEffect(() => {
-    persistPatch({ orderNote });
-  }, [orderNote, persistPatch]);
-
-  useEffect(() => {
-    persistPatch({ itemsVoucherDiscount });
-  }, [itemsVoucherDiscount, persistPatch]);
-
-  useEffect(() => {
-    persistPatch({ selectedCustomer });
-  }, [selectedCustomer, persistPatch]);
-
-  // --------- customer search ----------
   const fetchCustomers = useCallback(async (keyword) => {
     setCustomerLoading(true);
     try {
@@ -258,7 +260,6 @@ const PaymentCol = ({
     setSelectedCustomer(customer);
     setCustomerSearchTerm("");
     setCustomerSearchResults([]);
-
     const newDiscount = calculateCustomerDiscount(customer, totalAmount);
     onCustomerDiscountChange?.(newDiscount);
     onSelectCustomer?.(customer);
@@ -280,11 +281,8 @@ const PaymentCol = ({
 
   const handleChangePaymentMethod = (method) => {
     setPaymentMethod(method);
-    if (method.key !== "CASH") {
-      setCustomerPaidInput("");
-    } else {
-      if (netPayable > 0) setCustomerPaidInput(netPayable.toString());
-    }
+    if (method.key !== "CASH") setCustomerPaidInput("");
+    else if (netPayable > 0) setCustomerPaidInput(netPayable.toString());
   };
 
   const handleResetLocalForm = () => {
@@ -299,7 +297,6 @@ const PaymentCol = ({
     setShowPaymentModal(false);
   };
 
-  // --------- checkout ----------
   const handleFinalizeOrder = async () => {
     if (netPayable <= 0) {
       alert("Tổng tiền cần thanh toán phải lớn hơn 0 VND.");
@@ -314,19 +311,17 @@ const PaymentCol = ({
     const user = getUserFromStorage();
     const maTaiKhoan = user?.maTk;
     if (!maTaiKhoan) {
-      alert(
-        "LỖI ĐĂNG NHẬP: Không tìm thấy mã tài khoản.\nVui lòng đăng xuất và đăng nhập lại."
-      );
+      alert("LỖI ĐĂNG NHẬP: Vui lòng đăng xuất và đăng nhập lại.");
       return;
     }
 
     setIsProcessing(true);
-
     const FALLBACK_MA_CHI_NHANH = 1;
     const isOnlinePayment =
       paymentMethod.key === "MOMO" || paymentMethod.key === "VISA_MASTER";
     const paymentAmount = isOnlinePayment ? 0.0 : netPayable;
 
+    // ✅ ĐÃ HOÀN THIỆN: Ánh xạ mã Voucher vào payload gửi Backend
     const invoicePayload = {
       hoa_don: {
         ma_tk: maTaiKhoan,
@@ -334,7 +329,10 @@ const PaymentCol = ({
         ma_kh: selectedCustomer?.maKh || null,
         ma_km:
           itemsVoucherDiscount.length > 0 ? itemsVoucherDiscount[0].maKm : null,
-        ma_voucher_su_dung: null,
+        ma_voucher_su_dung:
+          itemsVoucherDiscount.length > 0
+            ? itemsVoucherDiscount[0].maCode
+            : null,
         ghi_chu: orderNote,
       },
       items: cartItems.map((item) => ({
@@ -353,31 +351,26 @@ const PaymentCol = ({
     try {
       const response = await invoiceApi.createInvoice(invoicePayload);
       const result = response.data || response;
-
       if (result.payUrl) {
         setMomoPaymentUrl(result.payUrl);
       } else {
         toast.success("Thanh toán thành công!");
-        onCheckoutSuccess?.(); // ✅ reset order ở Pos.jsx
+        onCheckoutSuccess?.();
         handleResetLocalForm();
       }
     } catch (error) {
-      console.error("🚨 LỖI GỐC (Raw Error):", error);
-
       let finalMessage = "Đã có lỗi không xác định xảy ra.";
       if (error.response) {
         const data = error.response.data;
-        if (typeof data === "string") finalMessage = data;
-        else if (data?.message) finalMessage = data.message;
-        else if (data?.error) finalMessage = data.error;
-        else finalMessage = JSON.stringify(data);
-      } else if (error.request) {
         finalMessage =
-          "Không thể kết nối đến Server. Vui lòng kiểm tra Internet hoặc địa chỉ API.";
+          typeof data === "string"
+            ? data
+            : data?.message || data?.error || JSON.stringify(data);
+      } else if (error.request) {
+        finalMessage = "Không thể kết nối đến Server.";
       } else {
         finalMessage = error.message;
       }
-
       alert(`🛑 LỖI THANH TOÁN:\n\n${finalMessage}`);
     } finally {
       setIsProcessing(false);
@@ -388,7 +381,6 @@ const PaymentCol = ({
     <Col md={4} className="payment-col ps-2">
       <Card style={{ minHeight: "calc(100vh - 70px)" }} className="shadow-sm">
         <Card.Body>
-          {/* --- KHÁCH HÀNG --- */}
           <div className="mb-3" style={{ position: "relative" }}>
             {selectedCustomer ? (
               <div className="p-2 bg-primary text-white rounded d-flex justify-content-between align-items-center">
@@ -425,7 +417,6 @@ const PaymentCol = ({
                     onBlur={() =>
                       setTimeout(() => setIsCustomerSearchFocused(false), 200)
                     }
-                    className="rounded-start"
                   />
                   <Button
                     variant="light"
@@ -438,13 +429,10 @@ const PaymentCol = ({
             )}
 
             {(isCustomerSearchFocused || customerSearchTerm) &&
-              (customerSearchResults.length > 0 || customerLoading) &&
               !selectedCustomer && (
                 <div
                   className="list-group position-absolute w-100 shadow-lg border mt-1"
                   style={{
-                    top: "100%",
-                    left: 0,
                     zIndex: 1001,
                     maxHeight: "250px",
                     overflowY: "auto",
@@ -452,8 +440,7 @@ const PaymentCol = ({
                 >
                   {customerLoading ? (
                     <div className="list-group-item text-center">
-                      <Spinner animation="border" size="sm" className="me-2" />
-                      Đang tải...
+                      <Spinner animation="border" size="sm" /> Đang tải...
                     </div>
                   ) : (
                     customerSearchResults.map((customer) => (
@@ -472,47 +459,42 @@ const PaymentCol = ({
                 </div>
               )}
           </div>
-
           <hr />
-
-          {/* --- CHI TIẾT TIỀN --- */}
           <div className="mb-3">
             <Row className="mb-2 text-dark fw-bold">
               <Col>Tổng tiền hàng:</Col>
               <Col className="text-end">{formatCurrency(totalAmount)}</Col>
             </Row>
-
             <Row className="mb-2">
               <Col>
-                Chiết khấu hạng
+                Chiết khấu hạng{" "}
                 {selectedCustomer
-                  ? ` (${selectedCustomer.phanTramChietKhau}%)`
+                  ? `(${selectedCustomer.phanTramChietKhau}%)`
                   : ""}
               </Col>
               <Col className="text-end text-danger">
                 -{formatCurrency(cartSummary.customerDiscountAmount || 0)}
               </Col>
             </Row>
-
             <Row className="mb-2 align-items-center">
               <Col className="d-flex align-items-center gap-2">
-                <span>Chiết khấu KM</span>
-              </Col>
-              <Col className="text-end text-danger fw-semibold">
-                -{formatCurrency(discount)}
-              </Col>
-            </Row>
-
-            <Row className="mb-2 align-items-center">
-              <Col className="d-flex align-items-center gap-2">
-                <span>Mã KM</span>
+                <span>
+                  Mã KM
+                  {itemsVoucherDiscount.length > 0 && (
+                    <Badge bg="info" className="ms-1">
+                      {itemsVoucherDiscount[0].maCode}
+                    </Badge>
+                  )}
+                </span>
                 <button
                   type="button"
                   className="btn btn-sm btn-outline-primary d-flex align-items-center gap-1"
-                  onClick={() => setIsShowModalVoucher(!isShowModalVoucher)}
+                  onClick={() => setIsShowModalVoucher(true)}
                 >
                   <PlusSlashMinus size={14} />
-                  <span>Thêm mã</span>
+                  <span>
+                    {itemsVoucherDiscount.length > 0 ? "Đổi mã" : "Thêm mã"}
+                  </span>
                 </button>
               </Col>
               <Col className="text-end text-danger fw-semibold">
@@ -520,31 +502,23 @@ const PaymentCol = ({
               </Col>
             </Row>
           </div>
-
           <hr />
-
-          {/* --- THANH TOÁN --- */}
           <div className="mb-3">
             <h4 className="text-primary d-flex justify-content-between mb-3 p-2 bg-light rounded shadow-sm">
               <div>KHÁCH PHẢI TRẢ</div>
               <div>{formatCurrency(netPayable)}</div>
             </h4>
-
             <Row className="mb-3 border-bottom pb-2">
-              <Col md={5} className="fw-bold d-flex align-items-center">
+              <Col md={5} className="fw-bold">
                 Hình thức:
               </Col>
-              <Col
-                md={7}
-                className="text-end fw-bold d-flex align-items-center justify-content-end"
-              >
+              <Col md={7} className="text-end fw-bold">
                 <span className={`text-${paymentMethod.color} me-2`}>
                   {paymentMethod.icon}
                 </span>
-                <span className="text-dark">{paymentMethod.name}</span>
+                {paymentMethod.name}
               </Col>
             </Row>
-
             {paymentMethod.key === "CASH" ? (
               <>
                 <Row className="mb-2">
@@ -562,24 +536,21 @@ const PaymentCol = ({
               </>
             ) : (
               <div className="alert alert-info py-2 text-center my-2">
-                Thanh toán online: Khách trả {formatCurrency(netPayable)}
+                Thanh toán online: {formatCurrency(netPayable)}
               </div>
             )}
           </div>
         </Card.Body>
-
         <Card.Footer className="bg-white pt-3">
           <Form.Group className="mb-3">
-            <Form.Label className="fw-bold">Ghi chú đơn hàng</Form.Label>
+            <Form.Label className="fw-bold">Ghi chú</Form.Label>
             <Form.Control
               as="textarea"
               rows={1}
-              placeholder="Nhập ghi chú..."
               value={orderNote}
               onChange={(e) => setOrderNote(e.target.value)}
             />
           </Form.Group>
-
           <div className="d-flex justify-content-between align-items-center mt-3">
             <Button
               variant="secondary"
@@ -587,7 +558,7 @@ const PaymentCol = ({
               onClick={handleShowPaymentModal}
               disabled={isProcessing}
             >
-              Đổi hình thức
+              Hình thức
             </Button>
             <Button
               variant="primary"
@@ -596,10 +567,7 @@ const PaymentCol = ({
               disabled={netPayable <= 0 || isProcessing}
             >
               {isProcessing ? (
-                <>
-                  <Spinner animation="border" size="sm" className="me-2" />
-                  Đang xử lý...
-                </>
+                <Spinner animation="border" size="sm" />
               ) : (
                 "THANH TOÁN"
               )}
@@ -608,20 +576,18 @@ const PaymentCol = ({
         </Card.Footer>
       </Card>
 
-      {/* MODAL chọn phương thức */}
       <Modal
         show={showPaymentModal}
         onHide={() => setShowPaymentModal(false)}
         centered
       >
         <Modal.Header closeButton className="bg-primary text-white">
-          <Modal.Title>Chọn Phương thức Thanh toán</Modal.Title>
+          <Modal.Title>Phương thức thanh toán</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <h4 className="text-center text-primary mb-3">
             Cần thanh toán: {formatCurrency(netPayable)}
           </h4>
-
           <ListGroup horizontal className="d-flex justify-content-between mb-3">
             {PAYMENT_METHODS.map((method) => (
               <ListGroup.Item
@@ -629,15 +595,14 @@ const PaymentCol = ({
                 action
                 onClick={() => handleChangePaymentMethod(method)}
                 active={paymentMethod.key === method.key}
-                className="d-flex flex-column align-items-center p-3 text-center"
-                style={{ flex: 1, borderRadius: "8px" }}
+                className="text-center"
               >
-                <span className="mb-1">{method.icon}</span>
+                {method.icon}
+                <br />
                 <small className="fw-bold">{method.name}</small>
               </ListGroup.Item>
             ))}
           </ListGroup>
-
           {paymentMethod.key === "CASH" && (
             <Form.Group className="mb-3 p-3 border rounded bg-light">
               <Form.Label className="fw-bold">Tiền khách đưa</Form.Label>
@@ -645,60 +610,17 @@ const PaymentCol = ({
                 type="number"
                 value={customerPaidInput}
                 onChange={(e) => setCustomerPaidInput(e.target.value)}
-                placeholder={netPayable.toString()}
-                className="fs-4 text-primary"
               />
-              <div className="d-flex justify-content-between mt-2 gap-2">
-                {[0, 10000, 50000, 100000].map((val) => (
-                  <Button
-                    key={val}
-                    variant="outline-primary"
-                    size="sm"
-                    onClick={() =>
-                      setCustomerPaidInput((netPayable + val).toString())
-                    }
-                  >
-                    {val === 0 ? "Đủ" : `+${val / 1000}k`}
-                  </Button>
-                ))}
-              </div>
             </Form.Group>
           )}
-
-          {paymentMethod.key !== "CASH" && (
-            <div className="alert alert-info text-center">
-              Xác nhận thanh toán <b>{formatCurrency(netPayable)}</b> qua{" "}
-              <b>{paymentMethod.name}</b>.
-            </div>
-          )}
-
-          <div
-            className={`mt-3 p-3 rounded text-center fw-bold fs-5 ${
-              change >= 0
-                ? "bg-success-subtle text-success"
-                : "bg-danger-subtle text-danger"
-            }`}
-          >
-            {change >= 0 ? "Tiền thừa trả khách:" : "Khách còn thiếu:"}
-            <span className="ms-2 fs-4">
-              {formatCurrency(Math.abs(change))}
-            </span>
-          </div>
         </Modal.Body>
         <Modal.Footer>
-          <Button
-            variant="secondary"
-            onClick={() => setShowPaymentModal(false)}
-          >
-            Hủy
-          </Button>
           <Button variant="primary" onClick={() => setShowPaymentModal(false)}>
             XÁC NHẬN
           </Button>
         </Modal.Footer>
       </Modal>
 
-      {/* MODAL MOMO */}
       <Modal
         show={!!momoPaymentUrl}
         onHide={() => setMomoPaymentUrl(null)}
@@ -706,51 +628,33 @@ const PaymentCol = ({
         centered
       >
         <Modal.Header className="bg-danger text-white">
-          <Modal.Title>
-            <QrCode className="me-2" />
-            Thanh toán MoMo
-          </Modal.Title>
+          <Modal.Title>Thanh toán MoMo</Modal.Title>
         </Modal.Header>
         <Modal.Body className="text-center p-4">
-          <p className="fs-5">Đơn hàng đã được khởi tạo thành công.</p>
-          <p className="text-muted mb-4">
-            Vui lòng nhấn nút bên dưới để mở trang thanh toán MoMo.
-          </p>
-
           <Button
             variant="danger"
             size="lg"
-            className="w-100 py-3 fw-bold shadow"
+            className="w-100"
             onClick={() => {
-              if (momoPaymentUrl) {
-                window.open(momoPaymentUrl, "_blank");
-                // reset order ở Pos
-                onCheckoutSuccess?.();
-                handleResetLocalForm();
-              }
+              window.open(momoPaymentUrl, "_blank");
+              onCheckoutSuccess?.();
+              handleResetLocalForm();
             }}
           >
-            <BoxArrowUpRight className="me-2" />
-            MỞ ỨNG DỤNG MOMO
+            MỞ MOMO
           </Button>
         </Modal.Body>
-        <Modal.Footer className="justify-content-center">
-          <small className="text-muted">
-            Cửa sổ thanh toán sẽ mở trong tab mới
-          </small>
-        </Modal.Footer>
       </Modal>
 
       <AddCustomer
         show={isShowModalAddCus}
-        onClose={() => setIsShowModalAddCus(!isShowModalAddCus)}
+        onClose={() => setIsShowModalAddCus(false)}
         onSubmit={() => fetchCustomers("")}
       />
-
       <VoucherModal
         show={isShowModalVoucher}
-        onClose={() => setIsShowModalVoucher(!isShowModalVoucher)}
-        orderTotal={netPayable}
+        onClose={() => setIsShowModalVoucher(false)}
+        orderTotal={totalAmount}
         onApply={(selectedVouchers) =>
           setItemsVoucherDiscount(selectedVouchers || [])
         }

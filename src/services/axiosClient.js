@@ -13,16 +13,8 @@ axiosClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
 
-
-    const isPublicEndpoint =
-      config.url.includes("/san-pham") || 
-      config.url.includes("/danh-muc") || 
-      config.url.includes("/chi-nhanh") || 
-      config.url.includes("/lich-su-mua-hang") || 
-      config.url.includes("/register") || 
-      config.url.includes("/login"); 
-
-    if (token && !isPublicEndpoint) {
+    // Chỉ đính kèm Token nếu nó tồn tại
+    if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
 
