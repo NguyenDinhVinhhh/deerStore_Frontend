@@ -30,6 +30,8 @@ export default function Navbar() {
     name = "Thiết lập tồn kho ";
   } else if (name === "/admin/bao-cao-san-pham") {
     name = "Báo cáo sản phẩm ";
+  } else if (name === "/admin/no-permission") {
+    name = "Bạn không có quyền truy cập ! ";
   }
 
   const handleLogout = () => {

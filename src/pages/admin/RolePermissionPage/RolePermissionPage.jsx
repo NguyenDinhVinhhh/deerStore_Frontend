@@ -2,13 +2,13 @@ import React, { useEffect, useState } from "react";
 import roleApi from "../../../services/roleApi";
 import authoritiesApi from "../../../services/authoritiesApi";
 import { Table, Button, Spinner, Form, Modal } from "react-bootstrap";
-import { FaSync, FaKey, FaPlus, FaArrowLeft } from "react-icons/fa";
+import { FaKey, FaPlus, FaArrowLeft } from "react-icons/fa";
 
 export default function RolePermissionPage({ onBack }) {
   const [roles, setRoles] = useState([]);
   const [permissions, setPermissions] = useState([]);
   const [selectedRole, setSelectedRole] = useState(null);
-  const [rolePermissions, setRolePermissions] = useState([]); // mảng tenQuyen
+  const [rolePermissions, setRolePermissions] = useState([]); // Mảng chứa tenQuyen (String)
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [newRole, setNewRole] = useState({ tenVaiTro: "", moTa: "" });
@@ -24,7 +24,7 @@ export default function RolePermissionPage({ onBack }) {
     }
   };
 
-  // 🔹 Fetch danh sách quyền
+  // 🔹 Fetch danh sách quyền tổng quát
   const fetchPermissions = async () => {
     try {
       const res = await authoritiesApi.getAll();
@@ -34,15 +34,17 @@ export default function RolePermissionPage({ onBack }) {
     }
   };
 
-  // 🔹 Lấy quyền theo vai trò
+  // 🔹 Lấy quyền thực tế của một vai trò cụ thể
   const fetchRolePermissions = async (roleId) => {
     setLoading(true);
     try {
       const res = await roleApi.getPermissions(roleId);
-      // res.data là mảng tenQuyen
-      setRolePermissions(res.data || []);
+      // Đảm bảo dữ liệu lưu vào là mảng các chuỗi tên quyền
+      const data = res.data || res;
+      setRolePermissions(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Lỗi tải quyền vai trò:", error);
+      setRolePermissions([]);
     } finally {
       setLoading(false);
     }
@@ -53,39 +55,59 @@ export default function RolePermissionPage({ onBack }) {
     fetchPermissions();
   }, []);
 
-  // 🔹 Chọn vai trò
+  // 🔹 Chọn vai trò từ danh sách bên trái
   const handleSelectRole = (role) => {
     setSelectedRole(role);
     fetchRolePermissions(role.maVaiTro);
   };
 
-  // 🔹 Kiểm tra quyền đã có chưa
-  const hasPermission = (permission) =>
-    rolePermissions.includes(permission.tenQuyen);
+  // 🔹 Kiểm tra xem một quyền cụ thể đã được gán chưa
+  // Logic này quan trọng để hiển thị trạng thái của Switch
+  const hasPermission = (permission) => {
+    if (!rolePermissions || !permission) return false;
+    return rolePermissions.includes(permission.tenQuyen);
+  };
 
-  // 🔹 Gán hoặc gỡ quyền
+  // 🔹 Gán hoặc gỡ quyền (Optimistic UI Update)
   const handleTogglePermission = async (permission) => {
     if (!selectedRole) return;
     const roleId = selectedRole.maVaiTro;
+    const permissionName = permission.tenQuyen;
+
+    // 1. Xác định trạng thái trước khi thay đổi
+    const isCurrentlyAssigned = hasPermission(permission);
+    const previousPermissions = [...rolePermissions];
+
+    // 2. Cập nhật giao diện ngay lập tức (Optimistic Update)
+    if (isCurrentlyAssigned) {
+      setRolePermissions((prev) =>
+        prev.filter((name) => name !== permissionName)
+      );
+    } else {
+      setRolePermissions((prev) => [...prev, permissionName]);
+    }
+
     try {
-      if (hasPermission(permission)) {
+      // 3. Gọi API thực tế dựa trên trạng thái cũ
+      if (isCurrentlyAssigned) {
         await roleApi.removePermission(roleId, permission.maQuyen);
       } else {
         await roleApi.assignPermission(roleId, permission.maQuyen);
       }
-      fetchRolePermissions(roleId); // refresh trạng thái sau khi gán/xóa
     } catch (error) {
       console.error("Lỗi cập nhật quyền:", error);
+      // Rollback nếu API thất bại
+      setRolePermissions(previousPermissions);
+      alert("Cập nhật quyền thất bại, vui lòng thử lại!");
     }
   };
 
-  // 🔹 Mở modal thêm vai trò
+  // 🔹 Modal thêm vai trò
   const handleShowModal = () => {
     setNewRole({ tenVaiTro: "", moTa: "" });
     setShowModal(true);
   };
 
-  // 🔹 Gửi form thêm vai trò
   const handleAddRole = async () => {
     if (!newRole.tenVaiTro.trim()) {
       alert("Tên vai trò không được để trống!");
@@ -95,7 +117,7 @@ export default function RolePermissionPage({ onBack }) {
       setSubmitting(true);
       await roleApi.create(newRole);
       setShowModal(false);
-      fetchRoles(); // refresh danh sách
+      fetchRoles();
     } catch (error) {
       console.error("Lỗi thêm vai trò:", error);
       alert("Không thể thêm vai trò!");
@@ -106,7 +128,6 @@ export default function RolePermissionPage({ onBack }) {
 
   return (
     <div className="container py-4">
-      {/* Header */}
       <div className="d-flex justify-content-between align-items-center mb-4">
         <button className="btn btn-light border" onClick={onBack}>
           <FaArrowLeft className="me-2" /> Quay lại
@@ -115,22 +136,20 @@ export default function RolePermissionPage({ onBack }) {
           <FaKey className="me-2 text-primary" />
           Phân quyền hệ thống
         </h4>
-        <div>
-          <Button variant="success" className="me-2" onClick={handleShowModal}>
-            <FaPlus className="me-2" /> Thêm vai trò
-          </Button>
-        </div>
+        <Button variant="success" onClick={handleShowModal}>
+          <FaPlus className="me-2" /> Thêm vai trò
+        </Button>
       </div>
 
       <div className="row">
-        {/* 🔹 Danh sách vai trò */}
+        {/* Danh sách vai trò bên trái */}
         <div className="col-md-4">
-          <div className="card shadow-sm">
-            <div className="card-header fw-semibold bg-light">
+          <div className="card shadow-sm border-0">
+            <div className="card-header fw-bold bg-white py-3">
               Danh sách vai trò
             </div>
             <div className="card-body p-0">
-              <Table hover responsive className="m-0">
+              <Table hover className="mb-0">
                 <tbody>
                   {roles.map((role) => (
                     <tr
@@ -143,7 +162,17 @@ export default function RolePermissionPage({ onBack }) {
                       }
                       style={{ cursor: "pointer" }}
                     >
-                      <td className="fw-medium p-3">{role.tenVaiTro}</td>
+                      <td className="p-3 border-0">
+                        <span
+                          className={
+                            selectedRole?.maVaiTro === role.maVaiTro
+                              ? "fw-bold"
+                              : ""
+                          }
+                        >
+                          {role.tenVaiTro}
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -152,44 +181,50 @@ export default function RolePermissionPage({ onBack }) {
           </div>
         </div>
 
-        {/* 🔹 Chi tiết quyền */}
+        {/* Bảng chi tiết quyền bên phải */}
         <div className="col-md-8">
-          <div className="card shadow-sm">
-            <div className="card-header fw-semibold bg-light">
+          <div className="card shadow-sm border-0">
+            <div className="card-header fw-bold bg-white py-3">
               Quyền của vai trò:{" "}
               {selectedRole ? (
                 <span className="text-primary">{selectedRole.tenVaiTro}</span>
               ) : (
-                <span className="text-muted">Chưa chọn vai trò</span>
+                "..."
               )}
             </div>
             <div className="card-body">
               {loading ? (
-                <div className="text-center py-4">
+                <div className="text-center py-5">
                   <Spinner animation="border" variant="primary" />
                 </div>
               ) : selectedRole ? (
-                <Table striped bordered hover responsive>
-                  <thead>
+                <Table responsive hover className="align-middle">
+                  <thead className="table-light">
                     <tr>
-                      <th>#</th>
+                      <th style={{ width: "50px" }}>#</th>
                       <th>Tên quyền</th>
                       <th>Mô tả</th>
-                      <th>Trạng thái</th>
+                      <th className="text-center" style={{ width: "100px" }}>
+                        Trạng thái
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {permissions.map((perm, idx) => (
                       <tr key={perm.maQuyen}>
                         <td>{idx + 1}</td>
-                        <td>{perm.tenQuyen}</td>
-                        <td>{perm.moTa}</td>
+                        <td className="fw-bold text-secondary">
+                          {perm.tenQuyen}
+                        </td>
+                        <td className="small text-muted">{perm.moTa}</td>
                         <td className="text-center">
                           <Form.Check
                             type="switch"
                             id={`perm-${perm.maQuyen}`}
-                            checked={hasPermission(perm)}
+                            // !! ép kiểu về boolean để Switch hiển thị đúng On/Off
+                            checked={!!hasPermission(perm)}
                             onChange={() => handleTogglePermission(perm)}
+                            style={{ cursor: "pointer" }}
                           />
                         </td>
                       </tr>
@@ -197,27 +232,27 @@ export default function RolePermissionPage({ onBack }) {
                   </tbody>
                 </Table>
               ) : (
-                <p className="text-muted">
-                  Vui lòng chọn vai trò ở bên trái để xem và chỉnh sửa quyền.
-                </p>
+                <div className="text-center py-5 text-muted">
+                  Vui lòng chọn vai trò để thiết lập quyền.
+                </div>
               )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* 🔹 Modal thêm vai trò */}
+      {/* Modal Thêm vai trò */}
       <Modal show={showModal} onHide={() => setShowModal(false)} centered>
         <Modal.Header closeButton>
-          <Modal.Title>Thêm vai trò mới</Modal.Title>
+          <Modal.Title className="fw-bold">Thêm vai trò mới</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Form>
             <Form.Group className="mb-3">
-              <Form.Label>Tên vai trò</Form.Label>
+              <Form.Label className="fw-semibold">Tên vai trò</Form.Label>
               <Form.Control
                 type="text"
-                placeholder="Nhập tên vai trò..."
+                autoFocus
                 value={newRole.tenVaiTro}
                 onChange={(e) =>
                   setNewRole({ ...newRole, tenVaiTro: e.target.value })
@@ -225,11 +260,10 @@ export default function RolePermissionPage({ onBack }) {
               />
             </Form.Group>
             <Form.Group className="mb-3">
-              <Form.Label>Mô tả</Form.Label>
+              <Form.Label className="fw-semibold">Mô tả</Form.Label>
               <Form.Control
                 as="textarea"
                 rows={2}
-                placeholder="Nhập mô tả..."
                 value={newRole.moTa}
                 onChange={(e) =>
                   setNewRole({ ...newRole, moTa: e.target.value })
@@ -238,8 +272,8 @@ export default function RolePermissionPage({ onBack }) {
             </Form.Group>
           </Form>
         </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowModal(false)}>
+        <Modal.Footer className="border-0">
+          <Button variant="light" onClick={() => setShowModal(false)}>
             Hủy
           </Button>
           <Button
@@ -247,7 +281,7 @@ export default function RolePermissionPage({ onBack }) {
             onClick={handleAddRole}
             disabled={submitting}
           >
-            {submitting ? "Đang lưu..." : "Lưu"}
+            {submitting ? "Đang xử lý..." : "Lưu vai trò"}
           </Button>
         </Modal.Footer>
       </Modal>

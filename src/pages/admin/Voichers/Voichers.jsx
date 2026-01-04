@@ -246,7 +246,7 @@ function Voichers({ onBack }) {
               <Form.Label>Loại Khuyến mãi</Form.Label>
               <Form.Select {...register("loaiKm", { required: true })}>
                 <option value="PERCENT">Phần trăm</option>
-                <option value="AMOUNT">Tiền</option>
+                <option value="FIXED">Tiền</option>
               </Form.Select>
             </Form.Group>
 
